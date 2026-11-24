@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env*
+!.env.example
+receitas_preliminares.json
+produtos_importacao.csv
+playwright-report/
+test-results/

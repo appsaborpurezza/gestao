@@ -43,4 +43,3 @@ jobs:
       - name: Publicar aplicação
         id: deployment
         uses: actions/deploy-pages@v4
-
