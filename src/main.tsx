@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase'
 import { useHashRoute } from './lib/routes'
 import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
+import { RecipeList } from './features/recipes/RecipeList'
 import { ProductCatalog } from './features/products/ProductCatalog'
 import './styles/tokens.css'
 import './styles.css'
@@ -121,29 +122,14 @@ function Workspace({ userId }: { userId: string }) {
             onRetry={() => void catalog.refetch()} canConfigure={role === 'ADMINISTRADOR'} onConfigure={setUnitItem}
             focused={target?.module === 'products'} onShowAll={() => { setUnitItem(null); setTarget(null) }}/>}
         </section>}
-        {tab === 'recipes' && role !== 'VENDAS' && <section className="panel"><h1>Receitas</h1>
-          {target?.module === 'recipes' && <button type="button" className="secondary" onClick={() => { setRecipeReview(null); setTarget(null) }}>Ver todas as receitas</button>}
-          {recipeReview ? <Suspense fallback={<p role="status">Abrindo ficha…</p>}>
+        {tab === 'recipes' && role !== 'VENDAS' && (recipeReview ? <section className="panel">
+          <Suspense fallback={<Skeleton lines={4} label="Abrindo ficha…"/>}>
             <RecipeReview key={recipeReview.id} versionId={recipeReview.id} title={recipeReview.title}
               canEdit={role === 'ADMINISTRADOR'} canApprove={profile.data.can_approve_recipe} onClose={() => setRecipeReview(null)}/>
-          </Suspense> : <>
-          {recipes.isPending && <p role="status">Carregando receitas…</p>}
-          {recipes.isError && <p role="alert">Falha ao carregar receitas.</p>}
-          {recipes.data?.length === 0 && <p>Nenhuma receita cadastrada.</p>}
-          {recipes.data?.map(recipe => <article key={recipe.id}>
-            <h2>{recipe.code} · {recipe.name}</h2>
-            {recipe.recipe_versions.map(version => <details key={version.id}>
-              <summary>Versão {version.version} · {version.status === 'APROVADA' ? 'Aprovada' : 'Pendente de validação'}</summary>
-              <ul>{[...version.recipe_ingredients].sort((a,b) => a.ordinal - b.ordinal).map(ingredient => <li key={ingredient.id}>
-                {ingredient.source_name} · {ingredient.quantity == null ? 'Quantidade a validar' : `${Number(ingredient.quantity).toLocaleString('pt-BR')} ${ingredient.unit}`}
-              </li>)}</ul>
-              <button className="secondary" type="button" onClick={() => setRecipeReview({
-                id: version.id, title: recipe.name + ' · versão ' + version.version,
-              })}>Abrir ficha técnica</button>
-            </details>)}
-          </article>)}
-          </>}
-        </section>}
+          </Suspense>
+        </section> : <RecipeList recipes={recipes.data} loading={recipes.isFetching} error={recipes.isError}
+          onRetry={() => void recipes.refetch()} focused={target?.module === 'recipes'}
+          onShowAll={() => { setRecipeReview(null); setTarget(null) }} onOpen={setRecipeReview}/>)}
         {tab === 'import' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo importação…</p>}>
           <ImportForm/>
         </Suspense>}

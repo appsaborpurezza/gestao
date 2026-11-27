@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
+import { Bell, CheckCircle2, RefreshCw } from 'lucide-react'
+import { EmptyState, ErrorState, PageHeader, Skeleton, StatCard } from '../../ui'
 
 const definitions = {
   ORDERS_OVERDUE: ['Pedidos atrasados', 'orders', 'Abrir pedidos'],
@@ -26,23 +28,25 @@ export default function OperationalAlerts({ accountScope, onNavigate }: { accoun
   const visible = [...(alerts.data ?? [])].sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical'))
 
   return <section className="panel">
-    <h1>Central de alertas</h1>
-    <button className="secondary" type="button" disabled={alerts.isFetching} onClick={() => void alerts.refetch()}>Atualizar alertas</button>
-    {alerts.isPending && <p role="status">Consultando alertas…</p>}
-    {alerts.isError && <p role="alert">Falha ao consultar alertas. Tente atualizar.</p>}
-    {alerts.isSuccess && !visible.length && <p>Nenhum alerta para o seu perfil no momento.</p>}
-    {!!visible.length && <ul className="operational-alerts">
+    <PageHeader icon={Bell} title="Central de alertas" description="Pendências que precisam de ação, conforme o seu perfil."
+      actions={<button className="secondary" type="button" disabled={alerts.isFetching} onClick={() => void alerts.refetch()}>
+        <RefreshCw aria-hidden="true" size={16}/>Atualizar alertas</button>}/>
+    {alerts.isPending && <Skeleton lines={4} label="Consultando alertas…"/>}
+    {alerts.isError && <ErrorState title="Falha ao consultar alertas" onRetry={() => void alerts.refetch()}/>}
+    {alerts.isSuccess && !visible.length && <EmptyState icon={CheckCircle2} title="Nenhum alerta no momento"
+      description="Não há pendências para o seu perfil."/>}
+    {!!visible.length && <div className="ui-stat-grid" role="list" aria-label="Alertas">
       {visible.map(alert => {
         const definition = definitions[alert.code]
         if (!definition) return null
         const [title, destination, action] = definition
-        return <li key={alert.code} data-severity={alert.severity}>
-          <span>{alert.severity === 'critical' ? 'Crítico' : 'Atenção'}</span>
-          <h2>{title}</h2>
-          <strong>{alert.quantity.toLocaleString('pt-BR')}</strong>
-          <button type="button" className="secondary" onClick={() => onNavigate(destination)}>{action}</button>
-        </li>
+        return <div role="listitem" key={alert.code}>
+          <StatCard label={title} value={alert.quantity.toLocaleString('pt-BR')}
+            tone={alert.severity === 'critical' ? 'danger' : 'warning'}
+            context={<>{alert.severity === 'critical' ? 'Crítico' : 'Atenção'} · {action}</>}
+            onOpen={() => onNavigate(destination)}/>
+        </div>
       })}
-    </ul>}
+    </div>}
   </section>
 }

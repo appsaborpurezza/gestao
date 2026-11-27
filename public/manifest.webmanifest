@@ -1,0 +1,16 @@
+{
+  "name": "Sabor Purezza SMART",
+  "short_name": "Purezza SMART",
+  "description": "Gestão de pedidos, produção, estoque e qualidade da Sabor Purezza Massas.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#073b61",
+  "icons": [
+    { "src": "logo-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "logo-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
