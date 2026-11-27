@@ -1,7 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
 import { supabase } from '../../lib/supabase'
+import { Badge } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { FilterBar } from '../../ui/filters'
 
 type Shipment = {
   id: string; order_number: number; customer_name: string; delivery_date: string
@@ -10,7 +14,6 @@ type Shipment = {
   dispatched_at: string; delivered_at: string | null; delivery_reference: string | null
   returnable: string; returned_lots: { code: string; quantity: string }[]
 }
-const pageSize = 20
 const localDateTime = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
 })
@@ -49,16 +52,16 @@ function DeliveryForm({ shipment, onConfirmed }: { shipment: Shipment; onConfirm
   }
 
   const noun = shipment.method === 'RETIRADA' ? 'retirada' : 'entrega'
-  return <details><summary>Confirmar {noun}</summary>
-    <form onSubmit={confirm}>
+  return <details open><summary>Confirmar {noun}</summary>
+    <form className="ui-inline-form" onSubmit={confirm}>
       <label>Data e hora da {noun} (São Paulo)
         <input name="actual" type="datetime-local" aria-describedby={'help-' + shipment.id}/>
       </label>
-      <p id={'help-' + shipment.id}>Deixe em branco para registrar o horário atual.</p>
       <label>Referência do comprovante <input name="reference" maxLength={300}/></label>
-      {error && <p role="alert">{error}</p>}
-      <button disabled={busy}>{busy ? 'Registrando…' : 'Registrar ' + noun}</button>
+      <div><button disabled={busy}>{busy ? 'Registrando…' : 'Registrar ' + noun}</button></div>
     </form>
+    <p className="ui-muted" id={'help-' + shipment.id}>Deixe a data em branco para registrar o horário atual.</p>
+    {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
   </details>
 }
 
@@ -101,29 +104,32 @@ function ReturnForm({ shipment, locations, locationsUnavailable, onReturned }: {
   }
 
   return <details><summary>Registrar devolução</summary>
-    <p>Quantidade ainda devolvível: {formatStockQuantity(shipment.returnable)} {shipment.unit}.</p>
-    {locationsUnavailable && <p role="alert">Falha ao consultar locais de estoque.</p>}
-    {!locationsUnavailable && !locations.length && <p>Nenhum local ativo disponível.</p>}
-    <form onSubmit={register}>
+    <p className="ui-muted">Quantidade ainda devolvível: {formatStockQuantity(shipment.returnable)} {shipment.unit}.</p>
+    {locationsUnavailable && <p className="ui-message" data-tone="danger" role="alert">Falha ao consultar locais de estoque.</p>}
+    {!locationsUnavailable && !locations.length && <p className="ui-message">Nenhum local ativo disponível.</p>}
+    <form className="ui-inline-form" onSubmit={register}>
       <label>Local físico de quarentena <select name="location" required>
         <option value="">Selecione</option>{locations.map(location => <option key={location.id} value={location.id}>{location.code}</option>)}
       </select></label>
       <label>Quantidade devolvida ({shipment.unit}) <input name="amount" inputMode="decimal"
         pattern={shipment.unit === 'un' ? '[0-9]+' : '[0-9]+([,.][0-9]{1,6})?'} required/></label>
       <label>Motivo <input name="reason" maxLength={500} required/></label>
-      {error && <p role="alert">{error}</p>}
-      <button disabled={busy || !locations.length}>{busy ? 'Registrando…' : 'Receber em quarentena'}</button>
+      <div><button disabled={busy || !locations.length}>{busy ? 'Registrando…' : 'Receber em quarentena'}</button></div>
     </form>
+    {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
   </details>
 }
 
 export function ShipmentHistory({ allowConfirmation }: { allowConfirmation: boolean }) {
   const cache = useQueryClient()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
   const [pendingOnly, setPendingOnly] = useState(false)
   const [notice, setNotice] = useState('')
+  const [selected, setSelected] = useState<string | null>(null)
   const history = useQuery({
-    queryKey: ['shipping', 'history', pendingOnly, page],
+    queryKey: ['shipping', 'history', pendingOnly, page, pageSize],
+    placeholderData: previous => previous,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('shipment_history', {
         pending_only: pendingOnly, page_size: pageSize, page_offset: page * pageSize,
@@ -141,51 +147,72 @@ export function ShipmentHistory({ allowConfirmation }: { allowConfirmation: bool
       return data
     },
   })
+  const setPending = (value: boolean) => { setPendingOnly(value); setPage(0); setNotice(''); setSelected(null) }
+  const open = (row: Shipment) => { setSelected(row.id); setNotice('') }
+  const methodLabel = (row: Shipment) => row.method === 'RETIRADA' ? 'Retirada' : 'Entrega'
+  const columns: Column<Shipment>[] = [
+    { id: 'order', header: 'Pedido', cell: row => <span className="ui-cell-stack"><strong>Pedido {row.order_number}</strong><span>{row.customer_name}</span></span> },
+    { id: 'product', header: 'Produto', cell: row => <span className="ui-cell-stack"><span>{row.description}</span><span>{formatStockQuantity(row.quantity)} {row.unit}</span></span> },
+    { id: 'lot', header: 'Lote e local', optional: true, cell: row => <span className="ui-cell-stack"><span className="ui-code">{row.internal_code}</span><span>{row.location_code}</span></span> },
+    { id: 'dispatched', header: 'Despacho', cell: row => <span className="ui-cell-stack"><span>{stamp(row.dispatched_at)}</span><span>{methodLabel(row)}</span></span> },
+    { id: 'status', header: 'Situação', cell: row => <span className="ui-cell-stack">
+      {row.delivered_at ? <Badge tone="success">{row.method === 'RETIRADA' ? 'Retirada confirmada' : 'Entregue'}</Badge>
+        : <Badge tone="warning">{row.method === 'RETIRADA' ? 'Aguardando retirada' : 'Aguardando entrega'}</Badge>}
+      {row.returned_lots.length > 0 && <Badge tone="info">Com devolução</Badge>}
+    </span> },
+  ]
+  const stale = history.isPlaceholderData
+  const shipment = history.data?.rows.find(row => row.id === selected)
 
-  return <section>
-    <h2>Histórico de expedições</h2>
-    <label className="customer-check"><input type="checkbox" checked={pendingOnly} onChange={event => {
-      setPendingOnly(event.target.checked)
-      setPage(0)
-      setNotice('')
-    }}/> Somente entregas ou retiradas pendentes</label>
-    {notice && <p role="status">{notice}</p>}
-    {history.isPending && <p role="status">Carregando histórico…</p>}
-    {history.isError && <p role="alert">Falha ao consultar o histórico de expedição.</p>}
-    {history.data?.rows.length === 0 && <p>Nenhuma expedição nesta página.</p>}
-    {history.data?.rows.map(shipment => <article key={shipment.id}>
-      <h3>Pedido {shipment.order_number} · {shipment.customer_name}</h3>
-      <p>{shipment.description} · {formatStockQuantity(shipment.quantity)} {shipment.unit}</p>
-      <p>Lote {shipment.internal_code} · Local {shipment.location_code}</p>
-      <p>Despachado em {stamp(shipment.dispatched_at)} · {shipment.method === 'RETIRADA' ? 'Retirada' : 'Entrega'}</p>
-      <p>Previsão do pedido {shipment.delivery_date.split('-').reverse().join('/')}</p>
+  return <section aria-labelledby="shipment-history-title">
+    <h2 id="shipment-history-title" className="sr-only">Histórico de expedições</h2>
+    <FilterBar activeCount={pendingOnly ? 1 : 0} onClear={() => setPending(false)}
+      onRefresh={() => void history.refetch()} refreshing={history.isFetching}>
+      <label className="ui-check"><input type="checkbox" checked={pendingOnly}
+        onChange={event => setPending(event.target.checked)}/> Somente entregas ou retiradas pendentes</label>
+    </FilterBar>
+    {notice && <p className="ui-message" data-tone="success" role="status">{notice}</p>}
+    {shipment && <article className="ui-detail" aria-labelledby="shipment-title">
+      <div className="ui-detail-header">
+        <div>
+          <h3 id="shipment-title">Pedido {shipment.order_number} · {shipment.customer_name}</h3>
+          <p className="ui-muted">{shipment.description} · {formatStockQuantity(shipment.quantity)} {shipment.unit}</p>
+        </div>
+        <button type="button" className="secondary" onClick={() => setSelected(null)}><X aria-hidden="true" size={16}/>Fechar</button>
+      </div>
+      <dl>
+        <div><dt>Lote</dt><dd className="ui-code">{shipment.internal_code}</dd></div>
+        <div><dt>Local</dt><dd>{shipment.location_code}</dd></div>
+        <div><dt>Despachado em</dt><dd>{stamp(shipment.dispatched_at)} · {methodLabel(shipment)}</dd></div>
+        <div><dt>Previsão do pedido</dt><dd>{shipment.delivery_date.split('-').reverse().join('/')}</dd></div>
+        {shipment.delivered_at && <div><dt>{shipment.method === 'RETIRADA' ? 'Retirada confirmada' : 'Entrega confirmada'}</dt><dd>{stamp(shipment.delivered_at)}</dd></div>}
+        {shipment.delivery_reference && <div><dt>Comprovante</dt><dd>{shipment.delivery_reference}</dd></div>}
+      </dl>
       {shipment.notes && <p>{shipment.notes}</p>}
-      {shipment.delivered_at ? <>
-        <p>{shipment.method === 'RETIRADA' ? 'Retirada confirmada' : 'Entrega confirmada'} em {stamp(shipment.delivered_at)}.</p>
-        {shipment.delivery_reference && <p>Comprovante: {shipment.delivery_reference}</p>}
-      </> : <>
-        <p>{shipment.method === 'RETIRADA' ? 'Aguardando retirada' : 'Aguardando entrega'}</p>
-        {allowConfirmation && <DeliveryForm shipment={shipment} onConfirmed={() => {
-          setNotice(shipment.method === 'RETIRADA' ? 'Retirada confirmada.' : 'Entrega confirmada.')
-          void cache.invalidateQueries({ queryKey: ['shipping', 'history'] })
-        }}/>}
-      </>}
       {shipment.returned_lots.length > 0 && <ul aria-label="Devoluções registradas">
         {shipment.returned_lots.map(row => <li key={row.code}>
-          Devolvido: {formatStockQuantity(row.quantity)} {shipment.unit} · Lote {row.code}
+          Devolvido: {formatStockQuantity(row.quantity)} {shipment.unit} · Lote <span className="ui-code">{row.code}</span>
         </li>)}
       </ul>}
-      {allowConfirmation && Number(shipment.returnable) > 0 && <ReturnForm shipment={shipment}
+      {!shipment.delivered_at && allowConfirmation && <DeliveryForm key={shipment.id} shipment={shipment} onConfirmed={() => {
+        setNotice(shipment.method === 'RETIRADA' ? 'Retirada confirmada.' : 'Entrega confirmada.')
+        void cache.invalidateQueries({ queryKey: ['shipping', 'history'] })
+      }}/>}
+      {allowConfirmation && Number(shipment.returnable) > 0 && <ReturnForm key={'return-' + shipment.id} shipment={shipment}
         locations={locations.data ?? []} locationsUnavailable={locations.isError} onReturned={() => {
           setNotice('Devolução registrada em quarentena.')
           void cache.invalidateQueries({ queryKey: ['shipping', 'history'] })
           void cache.invalidateQueries({ queryKey: ['inventory'] })
         }}/>}
-    </article>)}
-    {history.data && (history.data.total > pageSize || page > 0) && <nav aria-label="Páginas do histórico">
-      <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-      <span>Página {page + 1} · {history.data.total} expedições</span>
-      <button type="button" disabled={(page + 1) * pageSize >= history.data.total} onClick={() => setPage(page + 1)}>Próxima</button>
-    </nav>}
+    </article>}
+    <DataTable caption="Histórico de expedições" rows={stale ? undefined : history.data?.rows} columns={columns} rowKey={row => row.id}
+      loading={history.isFetching} error={history.isError} onRetry={() => void history.refetch()}
+      total={history.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage}
+      onPageSizeChange={size => { setPageSize(size); setPage(0) }} preferenceKey="shipment-history"
+      filtered={pendingOnly} onClearFilters={() => setPending(false)}
+      empty={{ title: 'Nenhuma expedição registrada', description: 'Os despachos confirmados na fila aparecem aqui.' }}
+      onRowOpen={open}
+      rowActions={row => <button type="button" className="secondary" onClick={() => open(row)}>
+        {allowConfirmation && !row.delivered_at ? 'Confirmar' : 'Detalhes'}</button>}/>
   </section>
 }
