@@ -215,4 +215,6 @@ Em **Administração → Usuários e permissões**, administradores podem vincul
 
 O Kanban V2 usa a migration incremental `20261127000100_production_board_columns.sql`. A consulta retorna as seis etapas com totais filtrados e paginação própria. A busca abrange número da OP, pedido, cliente, produto e lote, ignora acentos e cancela requisições obsoletas.
 
+Em **Visualização → Lista da etapa**, o quadro apresenta a página da operação selecionada. **Abrir** mostra os detalhes e as ações autorizadas da massada em um painel lateral. O fechamento do painel preserva a pesquisa e a página da etapa.
+
 As migrations `20261127000200_production_board_realtime.sql` e `20261127000300_production_board_revision.sql` instalam os gatilhos e publicam somente a revisão do quadro via Postgres Changes. A tabela de revisão exige perfil ativo via RLS. O cliente agrupa sinais próximos, consulta somente o quadro ativo e mantém os filtros e a paginação. Quando o canal está indisponível, o quadro consulta a cada 60 segundos com a aba visível. Em **Gestão à vista**, Produção e Administração podem consultar as seis etapas sem ações de edição. Faça backup antes de aplicar as migrations V2 em produção. Para reverter a interface, publique a versão anterior do frontend, que continua usando a RPC original.

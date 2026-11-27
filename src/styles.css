@@ -125,6 +125,9 @@ textarea { padding: 9px; border: 1px solid #8196a8; border-radius: 8px; font: in
 .batch-card h3 { font-size: .95rem; margin: 0 0 4px; }
 .batch-card p { margin: 4px 0; }
 .board-stage-filter { display: none; }
+.board-list-filter { max-width: 24rem; margin-block: .85rem; }
+.board-detail-drawer { inset: 0 0 0 auto; margin: 0; width: min(37rem, 100%); height: 100dvh; max-height: none; max-width: none; border: 0; padding: 1.25rem; color: var(--text); }
+.board-detail-drawer::backdrop { background: rgb(7 33 55 / 55%); }
 @media (max-width: 700px) {
   .board-stage-filter { display: grid; margin-bottom: 12px; }
   .production-board { display: block; }

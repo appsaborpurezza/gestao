@@ -18,7 +18,7 @@ Portal de produção: [Sabor Purezza SMART](https://appsaborpurezza.github.io/ge
 | 10. Formulários | EM DESENVOLVIMENTO | Formulários dos módulos e `styles.css` | — | Validações SQL V1 | Fluxos existentes preservados | Combobox, confirmação e retenção de estado em todos os formulários |
 | 11. Dashboard executivo | EM DESENVOLVIMENTO | `Dashboard.tsx`, `dashboardPeriods.ts` | V1 041 | Períodos, Pareto, série e exportações | Indicadores em produção, atalhos no PR #5 | Indicadores faltantes e navegação para detalhamento |
 | 12. Painéis departamentais | NÃO INICIADO | — | — | — | Indicadores gerais existentes | Quatro painéis com filtros e detalhamento |
-| 13. Kanban | EM DESENVOLVIMENTO | `ProductionBoard.tsx` e componentes produtivos | V2 001–003 | Paginação por coluna, RLS e regressão de etapas | Kanban publicado | Visão por OP, lista, filtros restantes e drawer |
+| 13. Kanban | EM DESENVOLVIMENTO | `ProductionBoard.tsx` e componentes produtivos | V2 001–003 | Paginação por coluna, RLS e regressão de etapas | Kanban publicado; lista por etapa e painel lateral em desenvolvimento | Visão por OP, filtros restantes e teste autenticado da lista |
 | 14. Realtime | EM DESENVOLVIMENTO | `useBoardRealtime.ts` | V2 002–003 | Revisão e isolamento SQL em homologação | Postgres Changes configurado em produção | Teste de entrega entre dois dispositivos e medição |
 | 15. Modo TV | EM DESENVOLVIMENTO | `ProductionBoard.tsx`, `styles.css` | V2 001–003 | Build e role gating | Gestão à Vista publicada | Indicadores, operação específica e teste em monitor |
 | 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx`, componentes de apontamento | V1 029–039 | Regressão SQL | Seletor de etapa e ações existentes | UX por estação e E2E em tablet |

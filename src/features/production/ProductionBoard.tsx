@@ -33,6 +33,13 @@ type Batch = {
   stage_status: 'EM_EXECUCAO' | 'PAUSADA' | null; stage_net_seconds: number
   order_number: number; customer_name: string; description: string; delivery_date: string
 }
+const stateLabels = { blocked: 'Bloqueada', paused: 'Pausada', done: 'Finalizada', running: 'Em execução', waiting: 'Aguardando' }
+function batchState(batch: Batch) {
+  if (batch.recalled) return 'blocked'
+  if (batch.stage_status === 'PAUSADA') return 'paused'
+  if (batch.status === 'FINALIZADA') return 'done'
+  return batch.stage_status === 'EM_EXECUCAO' ? 'running' : 'waiting'
+}
 
 function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   const cache = useQueryClient()
@@ -46,9 +53,7 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   const request = useRef<string | null>(null)
   const stageRunning = canStart && !batch.recalled && batch.stage_status === 'EM_EXECUCAO'
   const lossOperation = lossOperations[batch.status]
-  const state = batch.recalled ? 'blocked' : batch.stage_status === 'PAUSADA' ? 'paused'
-    : batch.status === 'FINALIZADA' ? 'done' : batch.stage_status === 'EM_EXECUCAO' ? 'running' : 'waiting'
-  const stateLabel = { blocked: 'Bloqueada', paused: 'Pausada', done: 'Finalizada', running: 'Em execução', waiting: 'Aguardando' }[state]
+  const state = batchState(batch)
 
   async function start() {
     if (inFlight.current) return
@@ -75,7 +80,7 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   }
 
   return <article className="batch-card" data-state={state}>
-    <span className="batch-status">{stateLabel}</span>
+    <span className="batch-status">{stateLabels[state]}</span>
     <h3>OP {batch.production_number} · Massada {batch.sequence}/{batch.batches_count}</h3>
     <p>Pedido {batch.order_number} · {batch.customer_name}</p>
     <p>{batch.description}</p>
@@ -118,6 +123,9 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
   const [column, setColumn] = useState<Stage>('PLANEJADA')
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'board' | 'list'>('board')
+  const [selectedBatch, setSelectedBatch] = useState<string | null>(null)
+  const details = useRef<HTMLDialogElement>(null)
   const tv = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -140,12 +148,34 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
       return data as Record<Stage, { total: number; rows: Batch[] }>
     },
   })
+  const pages = board.data
+  const selected = pages && selectedBatch
+    ? columns.flatMap(([stage]) => pages[stage].rows).find(row => row.id === selectedBatch)
+    : undefined
+
+  function pagination(stage: Stage, title: string, total: number) {
+    const offset = offsets[stage] ?? 0
+    if (total <= pageSize && offset === 0) return null
+    return <nav aria-label={`Páginas de ${title}`}>
+      <button type="button" className="secondary" disabled={board.isPlaceholderData || offset === 0}
+        onClick={() => setOffsets(previous => ({ ...previous, [stage]: Math.max(0, offset - pageSize) }))}>Anterior</button>
+      <span>Página {Math.floor(offset / pageSize) + 1}</span>
+      <button type="button" className="secondary" disabled={board.isPlaceholderData || offset + pageSize >= total}
+        onClick={() => setOffsets(previous => ({ ...previous, [stage]: offset + pageSize }))}>Próxima</button>
+    </nav>
+  }
 
   return <section className="panel">
     <h1>Quadro de produção</h1>
     <p role="status">{realtime ? 'Atualização em tempo real' : 'Atualização periódica'}
       {board.dataUpdatedAt > 0 && ' · Última consulta ' + dateTime.format(board.dataUpdatedAt)}</p>
     <div className="customer-fields">
+      <label>Visualização
+        <select value={view} onChange={event => setView(event.target.value as 'board' | 'list')}>
+          <option value="board">Quadro por etapa</option>
+          <option value="list">Lista da etapa</option>
+        </select>
+      </label>
       <label>Buscar massadas
         <input type="search" maxLength={100} value={input} onChange={event => setInput(event.target.value)}
           placeholder="OP, pedido, cliente, produto ou lote"/>
@@ -162,27 +192,44 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
     {board.isPending && <p role="status">Carregando massadas…</p>}
     {board.isError && <p role="alert">Falha ao consultar o quadro de produção. Use Atualizar quadro para tentar novamente.</p>}
     {board.data && <>
-      <label className="board-stage-filter">Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
+      <label className={view === 'board' ? 'board-stage-filter' : 'board-list-filter'}>Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
         {columns.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
       </select></label>
-      <div className="production-board" aria-busy={board.isPlaceholderData}>
+      {view === 'board' ? <div className="production-board" aria-busy={board.isPlaceholderData}>
         {columns.map(([key, title]) => {
           const { total, rows } = board.data[key]
-          const offset = offsets[key] ?? 0
           return <section key={key} className="board-stage" data-selected={column === key}>
             <h2>{title} <span className="board-count">{total}</span></h2>
             {rows.length === 0 && <p>{total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
             {rows.map(batch => <BatchCard key={batch.id} batch={batch} canStart={canStart}/>)}
-            {(total > pageSize || offset > 0) && <nav aria-label={`Páginas de ${title}`}>
-              <button type="button" className="secondary" disabled={board.isPlaceholderData || offset === 0}
-                onClick={() => setOffsets(previous => ({ ...previous, [key]: Math.max(0, offset - pageSize) }))}>Anterior</button>
-              <button type="button" className="secondary" disabled={board.isPlaceholderData || offset + pageSize >= total}
-                onClick={() => setOffsets(previous => ({ ...previous, [key]: offset + pageSize }))}>Próxima</button>
-            </nav>}
+            {pagination(key, title, total)}
           </section>
         })}
-      </div>
+      </div> : <section aria-busy={board.isPlaceholderData}>
+        <h2>{columns.find(([key]) => key === column)?.[1]} <span className="board-count">{board.data[column].total}</span></h2>
+        {board.data[column].rows.length ? <div className="table-scroll"><table>
+          <thead><tr><th>OP e massada</th><th>Pedido e cliente</th><th>Produto</th><th>Lote</th><th>Entrega</th><th>Situação</th><th>Ação</th></tr></thead>
+          <tbody>{board.data[column].rows.map(batch => <tr key={batch.id}>
+            <th scope="row">OP {batch.production_number} · {batch.sequence}/{batch.batches_count}</th>
+            <td>{batch.order_number} · {batch.customer_name}</td><td>{batch.description}</td>
+            <td>{batch.output_code ?? batch.lot_code ?? 'A gerar'}</td>
+            <td>{batch.delivery_date.split('-').reverse().join('/')}</td>
+            <td>{stateLabels[batchState(batch)]}</td>
+            <td><button type="button" className="secondary" aria-haspopup="dialog" disabled={board.isPlaceholderData}
+              onClick={() => { setSelectedBatch(batch.id); details.current?.showModal() }}>
+              Abrir <span className="sr-only">OP {batch.production_number}, massada {batch.sequence}</span>
+            </button></td>
+          </tr>)}</tbody>
+        </table></div> : <p>{board.data[column].total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
+        {pagination(column, columns.find(([key]) => key === column)?.[1] ?? 'etapa', board.data[column].total)}
+      </section>}
     </>}
+    <dialog className="board-detail-drawer" ref={details} aria-labelledby="board-detail-title" onClose={() => setSelectedBatch(null)}>
+      <h2 id="board-detail-title">Detalhes da massada</h2>
+      <button type="button" className="secondary" onClick={() => details.current?.close()}>Fechar detalhes</button>
+      {selected ? <BatchCard key={selected.id} batch={selected} canStart={canStart}/>
+        : selectedBatch && <p role="status">A massada saiu da página consultada. Feche os detalhes para voltar ao quadro.</p>}
+    </dialog>
     {canStart && <dialog ref={tv} className="board-tv" aria-labelledby="board-tv-title">
       <header>
         <img className="shell-logo" src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas" width={56} height={56}/>
