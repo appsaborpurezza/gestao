@@ -3,7 +3,7 @@ import { Maximize, X } from 'lucide-react'
 import { todayInSaoPaulo } from '../../lib/periods'
 import { batchState, columns } from './ProductionBoard'
 import { batchDeadline } from './boardState'
-import { useBoardSnapshot } from './boardQuery'
+import { formatKg, useBoardSnapshot } from './boardQuery'
 
 const clock = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })
 const time = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })
@@ -19,13 +19,10 @@ export function TvBoard({ onExit }: { onExit: () => void }) {
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && !document.fullscreenElement) onExit() }
     window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key)
   }, [onExit])
-  const today = todayInSaoPaulo()
-  const all = board.data ? columns.flatMap(([stage]) => board.data[stage].rows) : []
-  const active = all.filter(batch => batch.status !== 'FINALIZADA')
-  const late = active.filter(batch => batchDeadline(batch, today) === 'late')
-  const attention = active.filter(batch => ['paused', 'blocked'].includes(batchState(batch)))
-  const finished = board.data?.FINALIZADA.total ?? 0
-  const planned = board.data ? columns.reduce((sum, [stage]) => sum + board.data[stage].total, 0) : 0
+  const today = board.data?.today ?? todayInSaoPaulo()
+  // Totais calculados no servidor sobre o quadro inteiro, não só sobre os cartões carregados.
+  const summary = board.data?.summary
+  const stages = board.data?.columns
 
   return <div className="tv" ref={root} role="region" aria-label="Modo TV da produção">
     <header className="tv-header">
@@ -39,19 +36,20 @@ export function TvBoard({ onExit }: { onExit: () => void }) {
         <button type="button" className="secondary" onClick={onExit}><X aria-hidden="true" size={18}/>Sair</button>
       </div>
     </header>
-    {board.data ? <>
+    {summary && stages ? <>
       <section className="tv-kpis" aria-label="Resumo">
-        <div><span>Massadas no quadro</span><strong>{planned}</strong></div>
-        <div data-tone="success"><span>Finalizadas</span><strong>{finished}</strong></div>
-        <div data-tone={late.length ? 'danger' : undefined}><span>Atrasadas</span><strong>{late.length}</strong></div>
-        <div data-tone={attention.length ? 'warning' : undefined}><span>Pausadas ou bloqueadas</span><strong>{attention.length}</strong></div>
+        <div><span>Massadas em produção</span><strong>{summary.active}</strong><small>{formatKg(summary.active_kg)}</small></div>
+        <div data-tone="success"><span>Finalizadas hoje</span><strong>{summary.finished_today}</strong><small>{formatKg(summary.finished_today_kg)}</small></div>
+        <div data-tone={summary.late ? 'danger' : undefined}><span>Atrasadas</span><strong>{summary.late}</strong></div>
+        <div data-tone={summary.paused + summary.blocked ? 'warning' : undefined}><span>Pausadas ou bloqueadas</span><strong>{summary.paused + summary.blocked}</strong></div>
       </section>
       <section className="tv-stages" aria-label="Massadas por etapa">
         {columns.filter(([stage]) => stage !== 'FINALIZADA').map(([stage, title]) => {
-          const { total, rows } = board.data[stage]
+          const { total, rows, kg } = stages[stage]
           return <article key={stage}>
             <h2>{title.replace(/ \(.*\)/, '')}</h2>
             <strong className="tv-stage-total">{total}</strong>
+            <small className="tv-stage-kg">{formatKg(kg)}</small>
             <ul>{rows.slice(0, 5).map(batch => {
               const state = batchState(batch)
               return <li key={batch.id} data-state={state} data-late={batchDeadline(batch, today) === 'late' || undefined}>

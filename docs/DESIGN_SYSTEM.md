@@ -63,3 +63,12 @@ const lifecycle = useLifecycle()
 - Estrela no cabeçalho marca a página atual como favorita; favoritos aparecem no topo da sidebar.
 - Ações rápidas por perfil (`quickActions`), na Visão geral e na paleta Ctrl+K. Abrem o formulário por rota de ação (`#/orders/novo`, `#/inventory/receber`, `#/losses/registrar`); nunca gravam sozinhas. Depois de abrir, o endereço volta para `#/modulo`, para que atualizar a página não reabra o formulário.
 - Paleta Ctrl+K: grupos Ações, Recentes, Módulos e Registros, destaque do trecho encontrado, setas/Home/End e Enter.
+
+## Kanban v2
+
+- Indicadores no topo (`.board-kpis`) são botões: clicar aplica o filtro correspondente e marca o indicador como ativo.
+- Visualizações salvas usam o escopo `production-board`, com as prontas Todas, Atrasadas, Entrega nesta semana, Pausadas e bloqueadas e Mais tempo na etapa.
+- Abas: Quadro por etapa, Por OP (barra de progresso do lote e chips por etapa) e Lista da etapa.
+- Peso sempre em kg com `formatKg` (pt-BR, uma casa decimal).
+- Terminal: fila de 30 em 30 com "Carregar mais"; nunca carrega a fila inteira.
+- Modo TV: só totais operacionais, nunca valores comerciais.
