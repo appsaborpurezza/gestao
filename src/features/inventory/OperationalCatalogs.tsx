@@ -1,16 +1,19 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Factory, Plus, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { Badge, PageHeader } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { Tabs } from '../../ui/Tabs'
 
 const catalogs = {
-  FORNECEDOR: { title: 'Fornecedores', table: 'suppliers', label: 'Nome do fornecedor' },
-  FABRICANTE: { title: 'Fabricantes', table: 'manufacturers', label: 'Nome do fabricante' },
-  LOCAL: { title: 'Locais de estoque', table: 'locations', label: 'Código do local' },
-  INSUMO: { title: 'Insumos', table: 'items', label: 'Descrição do insumo' },
+  FORNECEDOR: { title: 'Fornecedores', singular: 'fornecedor', table: 'suppliers', label: 'Nome do fornecedor' },
+  FABRICANTE: { title: 'Fabricantes', singular: 'fabricante', table: 'manufacturers', label: 'Nome do fabricante' },
+  LOCAL: { title: 'Locais de estoque', singular: 'local de estoque', table: 'locations', label: 'Código do local' },
+  INSUMO: { title: 'Insumos', singular: 'insumo', table: 'items', label: 'Descrição do insumo' },
 } as const
 type Catalog = keyof typeof catalogs
 type Row = { id: string; label: string; active: boolean; version: number; code?: string; unit?: string | null }
-const pageSize = 30
 const units = ['kg', 'g', 'un', 'L', 'mL']
 
 function CatalogForm({ catalog, entry, onClose }: { catalog: Catalog; entry: Row | null; onClose: () => void }) {
@@ -52,22 +55,32 @@ function CatalogForm({ catalog, entry, onClose }: { catalog: Catalog; entry: Row
     }
   }
 
-  return <form onSubmit={save}>
-    {catalog === 'INSUMO' && !entry && <label>Código interno <input name="code" maxLength={60} required/></label>}
-    {catalog === 'INSUMO' && entry && <p>Código {entry.code} · Unidade {entry.unit ?? 'A validar'}</p>}
-    <label>{catalogs[catalog].label}
-      <input name="label" maxLength={catalog === 'LOCAL' ? 60 : 180} defaultValue={entry?.label ?? ''} required/>
-    </label>
-    {catalog === 'INSUMO' && !entry && <label>Unidade base
-      <select name="unit" required><option value="">Selecione</option>
-        {units.map(unit => <option key={unit}>{unit}</option>)}
-      </select>
-    </label>}
-    <label className="customer-check"><input name="active" type="checkbox" defaultChecked={entry?.active !== false}/> Ativo</label>
-    {error && <p role="alert">{error}</p>}
-    <div className="customer-actions">
+  const title = entry ? 'Editar ' + catalogs[catalog].singular : 'Novo ' + catalogs[catalog].singular
+  return <form className="ui-form ui-detail" onSubmit={save} aria-labelledby="catalog-form-title">
+    <div className="ui-detail-header">
+      <div>
+        <h2 id="catalog-form-title">{title}</h2>
+        {catalog === 'INSUMO' && entry && <p className="ui-muted">Código <span className="ui-code">{entry.code}</span> · Unidade {entry.unit ?? 'A validar'}</p>}
+      </div>
+      <button type="button" className="secondary" disabled={busy} onClick={onClose}><X aria-hidden="true" size={16}/>Fechar</button>
+    </div>
+    <fieldset className="ui-fieldset">
+      <legend>Dados do cadastro</legend>
+      {catalog === 'INSUMO' && !entry && <label>Código interno <input name="code" maxLength={60} required/></label>}
+      <label>{catalogs[catalog].label}
+        <input name="label" maxLength={catalog === 'LOCAL' ? 60 : 180} defaultValue={entry?.label ?? ''} required/>
+      </label>
+      {catalog === 'INSUMO' && !entry && <label>Unidade base
+        <select name="unit" required><option value="">Selecione</option>
+          {units.map(unit => <option key={unit}>{unit}</option>)}
+        </select>
+      </label>}
+      <label className="ui-check"><input name="active" type="checkbox" defaultChecked={entry?.active !== false}/> Ativo</label>
+    </fieldset>
+    {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
+    <div className="ui-form-actions">
+      <button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancelar</button>
       <button disabled={busy}>{busy ? 'Salvando…' : 'Salvar cadastro'}</button>
-      <button type="button" className="secondary" disabled={busy} onClick={onClose}>Voltar</button>
     </div>
   </form>
 }
@@ -76,10 +89,12 @@ export function OperationalCatalogs() {
   const [catalog, setCatalog] = useState<Catalog>('FORNECEDOR')
   const [editor, setEditor] = useState<Row | null | undefined>()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
   const from = page * pageSize
   const to = from + pageSize - 1
   const list = useQuery({
-    queryKey: ['operational-catalog', catalog, page],
+    queryKey: ['operational-catalog', catalog, page, pageSize],
+    placeholderData: previous => previous,
     queryFn: async (): Promise<{ rows: Row[]; count: number }> => {
       if (catalog === 'INSUMO') {
         const { data, count, error } = await supabase.from('items')
@@ -103,32 +118,27 @@ export function OperationalCatalogs() {
       return { count: count ?? 0, rows: data.map(row => ({ ...row, label: row.name })) }
     },
   })
+  const stale = list.isPlaceholderData
+  const columns: Column<Row>[] = [
+    ...(catalog === 'INSUMO' ? [{ id: 'code', header: 'Código', cell: (row: Row) => <span className="ui-code">{row.code}</span> }] : []),
+    { id: 'label', header: catalogs[catalog].label, cell: row => <strong>{row.label}</strong> },
+    ...(catalog === 'INSUMO' ? [{ id: 'unit', header: 'Unidade', cell: (row: Row) => row.unit ?? <Badge tone="warning">A validar</Badge> }] : []),
+    { id: 'status', header: 'Status', cell: row => <Badge tone={row.active ? 'success' : 'neutral'}>{row.active ? 'Ativo' : 'Inativo'}</Badge> },
+  ]
 
   return <section className="panel">
-    <h1>Cadastros operacionais</h1>
-    {editor !== undefined ? <CatalogForm key={editor?.id ?? 'new'} catalog={catalog} entry={editor} onClose={() => setEditor(undefined)}/>
-      : <>
-        <nav aria-label="Tipos de cadastro">
-          {(Object.keys(catalogs) as Catalog[]).map(key => <button type="button" key={key} aria-pressed={catalog === key}
-            onClick={() => { setCatalog(key); setPage(0) }}>{catalogs[key].title}</button>)}
-        </nav>
-        <button type="button" onClick={() => setEditor(null)}>Novo cadastro</button>
-        {list.isPending && <p role="status">Carregando cadastros…</p>}
-        {list.isError && <p role="alert">Falha ao consultar os cadastros.</p>}
-        {list.data?.rows.length === 0 && <p>Nenhum cadastro nesta página.</p>}
-        {!!list.data?.rows.length && <div className="table-scroll"><table>
-          <thead><tr><th>{catalogs[catalog].label}</th><th>Status</th><th>Ação</th></tr></thead>
-          <tbody>{list.data.rows.map(row => <tr key={row.id}>
-            <td>{catalog === 'INSUMO' ? row.code + ' · ' + row.label + ' · ' + (row.unit ?? 'Unidade a validar') : row.label}</td>
-            <td>{row.active ? 'Ativo' : 'Inativo'}</td>
-            <td><button className="secondary" type="button" onClick={() => setEditor(row)}>Editar</button></td>
-          </tr>)}</tbody>
-        </table></div>}
-        {list.data && (list.data.count > pageSize || page > 0) && <nav aria-label="Páginas de cadastros">
-          <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-          <span>Página {page + 1} · {list.data.count} registros</span>
-          <button type="button" disabled={(page + 1) * pageSize >= list.data.count} onClick={() => setPage(page + 1)}>Próxima</button>
-        </nav>}
-      </>}
+    <PageHeader icon={Factory} title="Cadastros operacionais"
+      description="Fornecedores, fabricantes, locais de estoque e insumos usados no recebimento e na produção."
+      actions={editor === undefined && <button type="button" onClick={() => setEditor(null)}><Plus aria-hidden="true" size={16}/>Novo cadastro</button>}/>
+    <Tabs label="Tipos de cadastro" value={catalog} onChange={key => { setCatalog(key); setPage(0); setEditor(undefined) }}
+      items={(Object.keys(catalogs) as Catalog[]).map(key => ({ id: key, label: catalogs[key].title }))}/>
+    {editor !== undefined && <CatalogForm key={catalog + (editor?.id ?? 'new')} catalog={catalog} entry={editor} onClose={() => setEditor(undefined)}/>}
+    <DataTable caption={catalogs[catalog].title} rows={stale ? undefined : list.data?.rows} columns={columns} rowKey={row => row.id}
+      loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
+      total={list.data?.count ?? 0} page={page} pageSize={pageSize} onPageChange={setPage}
+      onPageSizeChange={size => { setPageSize(size); setPage(0) }}
+      empty={{ title: 'Nenhum cadastro', description: 'Use “Novo cadastro” para incluir o primeiro registro deste tipo.' }}
+      onRowOpen={row => setEditor(row)}
+      rowActions={row => <button className="secondary" type="button" onClick={() => setEditor(row)}>Editar</button>}/>
   </section>
 }

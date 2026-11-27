@@ -1,25 +1,32 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Truck, X } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
 import { supabase } from '../../lib/supabase'
+import { Badge, PageHeader } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { Tabs } from '../../ui/Tabs'
 import { ShipmentHistory } from './ShipmentHistory'
 
 type QueueRow = {
   id: string; order_number: number; customer_name: string; delivery_date: string; description: string
   unit: string; internal_code: string; location_code: string; remaining: string; eligible: boolean
 }
-const pageSize = 20
+const brDate = (value: string) => value.split('-').reverse().join('/')
 
 export function Shipping({ allowOperations }: { allowOperations: boolean }) {
   const [view, setView] = useState<'queue' | 'history'>(allowOperations ? 'queue' : 'history')
   const cache = useQueryClient()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
+  const [selected, setSelected] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null)
   const pending = useRef(new Map<string, string>())
   const inFlight = useRef(false)
   const queue = useQuery({
-    queryKey: ['shipping', 'queue', page],
+    queryKey: ['shipping', 'queue', page, pageSize],
+    placeholderData: previous => previous,
     enabled: allowOperations && view === 'queue',
     queryFn: async () => {
       const { data, error } = await supabase.rpc('shipping_queue', {
@@ -52,6 +59,7 @@ export function Shipping({ allowOperations }: { allowOperations: boolean }) {
       if (error) throw new Error(error.message)
       pending.current.delete(fingerprint)
       form.reset()
+      setSelected(null)
       setFeedback({ text: 'Despacho registrado e saldo físico atualizado.', error: false })
       await Promise.all([
         cache.invalidateQueries({ queryKey: ['shipping'] }),
@@ -66,38 +74,57 @@ export function Shipping({ allowOperations }: { allowOperations: boolean }) {
     }
   }
 
+  const columns: Column<QueueRow>[] = [
+    { id: 'order', header: 'Pedido', cell: row => <span className="ui-cell-stack"><strong>Pedido {row.order_number}</strong><span>{row.customer_name}</span></span> },
+    { id: 'product', header: 'Produto', cell: row => row.description },
+    { id: 'lot', header: 'Lote e local', cell: row => <span className="ui-cell-stack"><span className="ui-code">{row.internal_code}</span><span>{row.location_code}</span></span> },
+    { id: 'quantity', header: 'Reservado', align: 'end', cell: row => formatStockQuantity(row.remaining) + ' ' + row.unit },
+    { id: 'delivery', header: 'Entrega prevista', cell: row => brDate(row.delivery_date) },
+    { id: 'status', header: 'Situação', cell: row => row.eligible ? <Badge tone="success">Pronto para despacho</Badge> : <Badge tone="danger">Rever reserva</Badge> },
+  ]
+  const stale = queue.isPlaceholderData
+  const current = queue.data?.rows.find(row => row.id === selected)
+  const operating = allowOperations && view === 'queue'
+
   return <section className="panel">
-    <h1>Expedição</h1>
-    {allowOperations && <nav aria-label="Expedição">
-      <button type="button" aria-pressed={view === 'queue'} onClick={() => setView('queue')}>Fila de despacho</button>
-      <button type="button" aria-pressed={view === 'history'} onClick={() => setView('history')}>Histórico</button>
-    </nav>}
-    {view === 'history' || !allowOperations ? <ShipmentHistory allowConfirmation={allowOperations}/> : <>
-    {feedback && <p role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
-    {queue.isPending && <p role="status">Carregando reservas para expedição…</p>}
-    {queue.isError && <p role="alert">Falha ao consultar a fila de expedição.</p>}
-    {queue.data?.rows.length === 0 && <p>Nenhuma reserva nesta página.</p>}
-    {queue.data?.rows.map(row => <article key={row.id}>
-      <h2>Pedido {row.order_number} · {row.customer_name}</h2>
-      <p>{row.description} · Entrega prevista em {row.delivery_date.split('-').reverse().join('/')}</p>
-      <p>Lote {row.internal_code} · Local {row.location_code} · Reservado {formatStockQuantity(row.remaining)} {row.unit}</p>
-      {row.eligible ? <details><summary>Conferir e despachar</summary>
-        <form onSubmit={event => void dispatch(event, row)}>
-          <label>Quantidade despachada ({row.unit}) <input name="amount" inputMode="decimal"
-            pattern={row.unit === 'un' ? '[0-9]+' : '[0-9]+([,.][0-9]{1,6})?'} required/></label>
-          <label>Modalidade <select name="method" required>
-            <option value="">Selecione</option><option value="ENTREGA">Entrega</option><option value="RETIRADA">Retirada</option>
-          </select></label>
-          <label>Observações do despacho <textarea name="notes" maxLength={500} rows={2}/></label>
-          <button disabled={busy}>Confirmar despacho e baixa</button>
-        </form>
-      </details> : <p role="status">O lote ou local está inelegível para despacho. A reserva precisa ser revista.</p>}
-    </article>)}
-    {queue.data && (queue.data.total > pageSize || page > 0) && <nav aria-label="Páginas da fila de expedição">
-      <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-      <span>Página {page + 1} · {queue.data.total} reservas</span>
-      <button type="button" disabled={(page + 1) * pageSize >= queue.data.total} onClick={() => setPage(page + 1)}>Próxima</button>
-    </nav>}
+    <PageHeader icon={Truck} title="Expedição"
+      description={operating ? 'Confira cada reserva, registre o despacho e dê baixa no saldo físico.' : 'Despachos realizados, confirmação de entrega ou retirada e devoluções.'}/>
+    {allowOperations && <Tabs label="Expedição" value={view} onChange={next => { setView(next); setFeedback(null) }} items={[
+      { id: 'queue', label: 'Fila de despacho' }, { id: 'history', label: 'Histórico' },
+    ]}/>}
+    {!operating ? <ShipmentHistory allowConfirmation={allowOperations}/> : <>
+    {feedback && <p className="ui-message" data-tone={feedback.error ? 'danger' : 'success'} role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
+    {current && <article className="ui-detail" aria-labelledby="dispatch-title">
+      <div className="ui-detail-header">
+        <div>
+          <h2 id="dispatch-title">Pedido {current.order_number} · {current.customer_name}</h2>
+          <p className="ui-muted">{current.description} · entrega prevista em {brDate(current.delivery_date)}</p>
+        </div>
+        <button type="button" className="secondary" onClick={() => setSelected(null)}><X aria-hidden="true" size={16}/>Fechar</button>
+      </div>
+      <dl>
+        <div><dt>Lote</dt><dd className="ui-code">{current.internal_code}</dd></div>
+        <div><dt>Local</dt><dd>{current.location_code}</dd></div>
+        <div><dt>Reservado</dt><dd>{formatStockQuantity(current.remaining)} {current.unit}</dd></div>
+      </dl>
+      {current.eligible ? <form className="ui-inline-form" onSubmit={event => void dispatch(event, current)}>
+        <label>Quantidade despachada ({current.unit}) <input name="amount" inputMode="decimal"
+          pattern={current.unit === 'un' ? '[0-9]+' : '[0-9]+([,.][0-9]{1,6})?'} required/></label>
+        <label>Modalidade <select name="method" required>
+          <option value="">Selecione</option><option value="ENTREGA">Entrega</option><option value="RETIRADA">Retirada</option>
+        </select></label>
+        <label>Observações do despacho <textarea name="notes" maxLength={500} rows={2}/></label>
+        <div><button disabled={busy}>{busy ? 'Registrando…' : 'Confirmar despacho e baixa'}</button></div>
+      </form> : <p className="ui-message" data-tone="danger" role="status">O lote ou local está inelegível para despacho. A reserva precisa ser revista.</p>}
+    </article>}
+    <DataTable caption="Fila de despacho" rows={stale ? undefined : queue.data?.rows} columns={columns} rowKey={row => row.id}
+      loading={queue.isFetching} error={queue.isError} onRetry={() => void queue.refetch()}
+      total={queue.data?.total ?? 0} page={page} pageSize={pageSize} onPageChange={setPage}
+      onPageSizeChange={size => { setPageSize(size); setPage(0) }}
+      empty={{ title: 'Nenhuma reserva aguardando despacho', description: 'Reservas confirmadas nos pedidos aparecem aqui para conferência.' }}
+      onRowOpen={row => { setSelected(row.id); setFeedback(null) }}
+      rowActions={row => <button type="button" className="secondary" onClick={() => { setSelected(row.id); setFeedback(null) }}>
+        {row.eligible ? 'Despachar' : 'Ver'}</button>}/>
     </>}
   </section>
 }

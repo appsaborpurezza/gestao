@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { PackageX } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
 import { supabase } from '../../lib/supabase'
+import { Badge, StatCard } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { FilterBar } from '../../ui/filters'
 import { useLossMutation, useLossOptions } from '../production/lossSupport'
 
 const categories = {
@@ -14,7 +18,6 @@ const todayLocal = () => new Intl.DateTimeFormat('sv-SE', {
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
 })
-const pageSize = 20
 
 export function StockWasteDetails({ lotId, unit, classification, locations }: {
   lotId: string; unit: string; classification: string; locations: { id: string; code: string }[]
@@ -47,12 +50,12 @@ function StockWasteForm({ lotId, unit, classification, locations }: {
   }
 
   return <>
-    <p>Use esta ação para material que ainda consta no saldo físico do lote.</p>
+    <p className="ui-muted">Use esta ação para material que ainda consta no saldo físico do lote.</p>
     {options.isPending && <p role="status">Carregando motivos e destinações…</p>}
-    {options.isError && <p role="alert">Falha ao carregar os cadastros de perdas.</p>}
-    {options.data?.destinations.length === 0 && <p>Cadastre uma destinação autorizada em Desperdícios.</p>}
-    {locations.length === 0 && <p>Nenhum saldo físico disponível para descarte.</p>}
-    {!!locations.length && !!options.data?.destinations.length && <form onSubmit={submit}>
+    {options.isError && <p className="ui-message" data-tone="danger" role="alert">Falha ao carregar os cadastros de perdas.</p>}
+    {options.data?.destinations.length === 0 && <p className="ui-message">Cadastre uma destinação autorizada em Desperdícios.</p>}
+    {locations.length === 0 && <p className="ui-message">Nenhum saldo físico disponível para descarte.</p>}
+    {!!locations.length && !!options.data?.destinations.length && <form className="ui-inline-form" onSubmit={submit}>
       <label>Local <select name="location" required><option value="">Selecione</option>
         {locations.map(row => <option key={row.id} value={row.id}>{row.code}</option>)}
       </select></label>
@@ -68,9 +71,9 @@ function StockWasteForm({ lotId, unit, classification, locations }: {
         {options.data.destinations.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}
       </select></label>
       <label>Observações <textarea name="notes" maxLength={500} rows={2}/></label>
-      <button disabled={mutation.busy}>{mutation.busy ? 'Registrando…' : 'Confirmar descarte e baixa'}</button>
+      <div><button disabled={mutation.busy}>{mutation.busy ? 'Registrando…' : 'Confirmar descarte e baixa'}</button></div>
     </form>}
-    {mutation.feedback && <p role={mutation.feedback.error ? 'alert' : 'status'}>{mutation.feedback.text}</p>}
+    {mutation.feedback && <p className="ui-message" data-tone={mutation.feedback.error ? 'danger' : 'success'} role={mutation.feedback.error ? 'alert' : 'status'}>{mutation.feedback.text}</p>}
   </>
 }
 
@@ -81,57 +84,62 @@ type Report = {
     reason: string; destination: string; notes: string | null; discarded_at: string; operator: string; lot_status: string })[]
 }
 
+type WasteRow = Report['rows'][number]
+
 export function StockWasteHistory() {
   const today = todayLocal()
-  const [filter, setFilter] = useState({ from_day: today, to_day: today, filter_category: null as string | null })
+  const initial = { from_day: today, to_day: today, filter_category: null as string | null }
+  const [filter, setFilter] = useState(initial)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
+  const validPeriod = !!filter.from_day && !!filter.to_day && filter.from_day <= filter.to_day
   const history = useQuery({
-    queryKey: ['losses', 'stock-history', filter, page],
+    queryKey: ['losses', 'stock-history', filter, page, pageSize],
+    enabled: validPeriod,
+    placeholderData: previous => previous,
     queryFn: async () => {
       const { data, error } = await supabase.rpc('stock_waste_history', { ...filter, page_size: pageSize, page_offset: page * pageSize })
       if (error) throw error
       return data as Report
     },
   })
-  return <section>
-    <h2>Descartes de estoque</h2>
-    <form onSubmit={event => {
-      event.preventDefault()
-      const fields = new FormData(event.currentTarget)
-      setPage(0)
-      setFilter({ from_day: String(fields.get('from')), to_day: String(fields.get('to')),
-        filter_category: String(fields.get('category') ?? '') || null })
-    }}>
-      <div className="customer-fields">
-        <label>De <input name="from" type="date" defaultValue={today} max={today} required/></label>
-        <label>Até <input name="to" type="date" defaultValue={today} max={today} required/></label>
-        <label>Categoria <select name="category"><option value="">Todas</option>
-          {Object.entries(categories).map(([key,label]) => <option key={key} value={key}>{label}</option>)}
-        </select></label>
-      </div>
-      <button>Consultar descartes</button>
-    </form>
-    {history.isPending && <p role="status">Carregando descartes…</p>}
-    {history.isError && <p role="alert">Falha ao consultar descartes. Confira o período.</p>}
-    {history.data?.total === 0 && <p>Nenhum descarte no período.</p>}
-    {history.data && <>
-      {!!history.data.totals.length && <ul aria-label="Totais por categoria e unidade">
-        {history.data.totals.map(row => <li key={row.category + '/' + row.unit}>
-          {categories[row.category]} · {formatStockQuantity(row.quantity)} {row.unit}
-        </li>)}
-      </ul>}
-      {history.data.rows.map(row => <article key={row.id}>
-        <h3>{row.description} · {formatStockQuantity(row.quantity)} {row.unit}</h3>
-        <p className="break-code">{row.internal_code} · {row.location_code} · {row.lot_status}</p>
-        <p>{categories[row.category]} · {row.reason} · {row.destination}</p>
-        <p>{dateTime.format(new Date(row.discarded_at))} · {row.operator}</p>
-        {row.notes && <p>{row.notes}</p>}
-      </article>)}
-      {(history.data.total > pageSize || page > 0) && <nav aria-label="Páginas de descartes">
-        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-        <span>Página {page + 1} · {history.data.total} registros</span>
-        <button type="button" disabled={(page + 1) * pageSize >= history.data.total} onClick={() => setPage(page + 1)}>Próxima</button>
-      </nav>}
-    </>}
+  const update = (next: Partial<typeof filter>) => { setFilter({ ...filter, ...next }); setPage(0) }
+  const activeFilters = Number(filter.from_day !== today || filter.to_day !== today) + Number(!!filter.filter_category)
+  const columns: Column<WasteRow>[] = [
+    { id: 'when', header: 'Descarte', cell: row => <span className="ui-cell-stack"><span>{dateTime.format(new Date(row.discarded_at))}</span><span>{row.operator}</span></span> },
+    { id: 'item', header: 'Item', cell: row => <span className="ui-cell-stack"><strong>{row.description}</strong><span className="ui-code">{row.internal_code}</span></span> },
+    { id: 'quantity', header: 'Quantidade', align: 'end', cell: row => <strong>{formatStockQuantity(row.quantity)} {row.unit}</strong> },
+    { id: 'category', header: 'Categoria', cell: row => <Badge>{categories[row.category]}</Badge> },
+    { id: 'reason', header: 'Motivo e destinação', cell: row => <span className="ui-cell-stack"><span>{row.reason}</span><span>{row.destination}</span></span> },
+    { id: 'location', header: 'Local', optional: true, cell: row => row.location_code },
+    { id: 'lot', header: 'Status do lote', optional: true, hiddenByDefault: true, cell: row => row.lot_status },
+    { id: 'notes', header: 'Observações', optional: true, hiddenByDefault: true, cell: row => row.notes ?? '—' },
+  ]
+  const stale = history.isPlaceholderData
+
+  return <section aria-labelledby="stock-waste-title">
+    <h2 id="stock-waste-title" className="sr-only">Descartes de estoque</h2>
+    <FilterBar activeCount={activeFilters} onClear={() => update(initial)}
+      onRefresh={() => void history.refetch()} refreshing={history.isFetching}>
+      <label>De <input type="date" value={filter.from_day} max={filter.to_day || today} required
+        onChange={event => update({ from_day: event.target.value })}/></label>
+      <label>Até <input type="date" value={filter.to_day} min={filter.from_day} max={today} required
+        onChange={event => update({ to_day: event.target.value })}/></label>
+      <label>Categoria <select value={filter.filter_category ?? ''} onChange={event => update({ filter_category: event.target.value || null })}>
+        <option value="">Todas</option>
+        {Object.entries(categories).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+      </select></label>
+    </FilterBar>
+    {!validPeriod && <p className="ui-message" data-tone="danger" role="alert">Informe um período válido: a data inicial não pode ser posterior à final.</p>}
+    {history.data && !stale && !!history.data.totals.length && <div className="ui-stat-grid" aria-label="Totais por categoria e unidade">
+      {history.data.totals.map(row => <StatCard key={row.category + '/' + row.unit} icon={PackageX}
+        label={categories[row.category]} value={formatStockQuantity(row.quantity)} unit={row.unit}/>)}
+    </div>}
+    <DataTable caption="Descartes de estoque" rows={!validPeriod ? [] : stale ? undefined : history.data?.rows} columns={columns}
+      rowKey={row => row.id} loading={history.isFetching} error={history.isError} onRetry={() => void history.refetch()}
+      total={validPeriod ? history.data?.total ?? 0 : 0} page={page} pageSize={pageSize} onPageChange={setPage}
+      onPageSizeChange={size => { setPageSize(size); setPage(0) }} preferenceKey="stock-waste"
+      filtered={activeFilters > 0} onClearFilters={() => update(initial)}
+      empty={{ title: 'Nenhum descarte no período', description: 'Descartes são registrados no detalhe do lote, em Estoque.' }}/>
   </section>
 }
