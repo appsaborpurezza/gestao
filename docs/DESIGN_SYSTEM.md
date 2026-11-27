@@ -64,6 +64,12 @@ const lifecycle = useLifecycle()
 - Ações rápidas por perfil (`quickActions`), na Visão geral e na paleta Ctrl+K. Abrem o formulário por rota de ação (`#/orders/novo`, `#/inventory/receber`, `#/losses/registrar`); nunca gravam sozinhas. Depois de abrir, o endereço volta para `#/modulo`, para que atualizar a página não reabra o formulário.
 - Paleta Ctrl+K: grupos Ações, Recentes, Módulos e Registros, destaque do trecho encontrado, setas/Home/End e Enter.
 
+## Painéis departamentais
+
+- Uma consulta por período e filtros alimenta as quatro abas; cada aba aparece só para o perfil que pode vê-la.
+- Valores clicáveis nas tabelas (receita, cliente, classificação) aplicam o filtro em todos os painéis e aparecem como chips removíveis.
+- Cartões de indicador levam ao módulo de detalhe (Kanban, Estoque, Desperdícios, Recolhimentos, Pedidos, Expedição).
+- As mesmas tabelas (`panelSections`) geram a tela, o PDF, o Excel e a impressão; a impressão usa `.report-print` e esconde o restante da página.
 ## Kanban v2
 
 - Indicadores no topo (`.board-kpis`) são botões: clicar aplica o filtro correspondente e marca o indicador como ativo.

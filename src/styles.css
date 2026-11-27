@@ -172,3 +172,14 @@ textarea { padding: 9px; border: 1px solid #8196a8; border-radius: 8px; font: in
 .operational-alerts li > span { color: var(--muted); font-size: .82rem; }
 .operational-alerts h2 { font-size: 1.1rem; margin: .35rem 0; }
 .operational-alerts strong { display: block; font-size: 1.6rem; color: var(--brand-navy); }
+
+/* Impressão dos painéis: só o relatório aparece no papel. */
+.report-print { display: none; }
+@media print {
+  body:has(.report-print) > :not(.report-print) { display: none !important; }
+  .report-print { display: block; color: black; background: white; font-size: 11pt; }
+  .report-print table { width: 100%; border-collapse: collapse; margin-bottom: 12pt; page-break-inside: auto; }
+  .report-print th, .report-print td { border: 1px solid #999; padding: 3pt 5pt; text-align: start; }
+  .report-print caption { font-weight: bold; text-align: start; padding-bottom: 4pt; }
+  .report-print tr { page-break-inside: avoid; }
+}

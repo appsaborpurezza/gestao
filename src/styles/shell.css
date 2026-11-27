@@ -833,6 +833,10 @@ nav .shell-department[aria-expanded=false] svg { transform: rotate(-90deg); }
 .ui-help-list dd { margin: 2px 0 0; color: var(--color-text-muted); }
 .ui-modal-body h3 { margin: var(--space-2) 0; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: .06em; color: var(--color-text-muted); }
 
+/* Painéis departamentais */
+.panel-filters { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-block: var(--space-2, 8px); }
+.panel-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--color-primary); border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: var(--weight-semibold, 600); }
+.panel-hint { color: var(--color-text-muted); font-size: 0.875rem; margin-block: var(--space-3, 12px) 0; }
 /* Kanban v2: indicadores do servidor, filtros por situação, kg por coluna e visão por OP. */
 .board-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: var(--space-2); margin-block: var(--space-3); }
 .board-kpi { display: grid; justify-items: start; gap: 2px; padding: var(--space-2) var(--space-3); min-height: 0; text-align: start;
