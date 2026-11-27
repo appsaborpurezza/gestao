@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase'
 import { useHashRoute } from './lib/routes'
 import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
+import { ProductCatalog } from './features/products/ProductCatalog'
 import './styles/tokens.css'
 import './styles.css'
 import './styles/shell.css'
@@ -113,26 +114,12 @@ function Workspace({ userId }: { userId: string }) {
         {tab === 'profiles' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo usuários…</p>}>
           <ProfileManagement userId={userId}/>
         </Suspense>}
-        {tab === 'products' && <section className="panel"><h1>Produtos</h1>
-          {target?.module === 'products' && <button type="button" className="secondary" onClick={() => { setUnitItem(null); setTarget(null) }}>Ver todos os produtos</button>}
-          {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<p role="status">Abrindo configuração…</p>}>
+        {tab === 'products' && <section>
+          {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<Skeleton lines={4} label="Abrindo configuração…"/>}>
             <ProductUnits key={productForUnits.id} product={productForUnits} onClose={() => setUnitItem(null)}/>
-          </Suspense> : <>
-          {catalog.isPending && <p role="status">Carregando produtos…</p>}
-          {catalog.isError && <p role="alert">Falha ao carregar produtos.</p>}
-          {catalog.data?.length === 0 && <p>Nenhum produto cadastrado.</p>}
-          {!!catalog.data?.length && <div className="table-scroll"><table><thead><tr>
-            <th>Código</th><th>Produto</th><th>Classificação</th><th>Validação</th><th>Unidade</th>
-            {role === 'ADMINISTRADOR' && <th>Ação</th>}
-          </tr></thead><tbody>{catalog.data.map(item => <tr key={item.id}>
-            <td>{item.original_code}</td><td>{item.commercial_description ?? item.original_description}</td>
-            <td>{item.classification.replaceAll('_', ' ')}</td><td>{item.validation_status.replaceAll('_', ' ')}</td>
-            <td>{item.base_unit ?? 'A validar'}</td>
-            {role === 'ADMINISTRADOR' && <td><button type="button" className="secondary" onClick={() => setUnitItem(item.id)}>
-              Configurar unidade<span className="sr-only"> do item {item.original_code}</span>
-            </button></td>}
-          </tr>)}</tbody></table></div>}
-          </>}
+          </Suspense> : <ProductCatalog items={catalog.data} loading={catalog.isFetching} error={catalog.isError}
+            onRetry={() => void catalog.refetch()} canConfigure={role === 'ADMINISTRADOR'} onConfigure={setUnitItem}
+            focused={target?.module === 'products'} onShowAll={() => { setUnitItem(null); setTarget(null) }}/>}
         </section>}
         {tab === 'recipes' && role !== 'VENDAS' && <section className="panel"><h1>Receitas</h1>
           {target?.module === 'recipes' && <button type="button" className="secondary" onClick={() => { setRecipeReview(null); setTarget(null) }}>Ver todas as receitas</button>}
