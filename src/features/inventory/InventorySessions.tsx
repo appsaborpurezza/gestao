@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { parseLotCode } from './lotCode'
 import { formatStockQuantity } from '../../lib/decimal'
+import { X } from 'lucide-react'
+import { Badge } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
 
 type Location = { id: string; code: string }
 type Props = {
@@ -19,6 +22,7 @@ export function InventorySessions({ admin, busy, locations, mutate }: Props) {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState('')
   const [finding, setFinding] = useState(false)
+  const [reviewing, setReviewing] = useState('')
   const sessions = useQuery({
     queryKey: ['inventory', 'sessions'],
     queryFn: async () => {
@@ -82,9 +86,34 @@ export function InventorySessions({ admin, busy, locations, mutate }: Props) {
     }
   }
 
-  return <section>
-    <h2>Sessões de inventário</h2>
-    {locations.length > 0 && <form onSubmit={async event => {
+  type SessionRow = NonNullable<typeof sessions.data>[number]
+  type CountRow = NonNullable<typeof counts.data>[number]
+  const locationCode = (id: string) => locations.find(location => location.id === id)?.code ?? 'Local inativo'
+  const sessionColumns: Column<SessionRow>[] = [
+    { id: 'location', header: 'Local', cell: row => <strong>{locationCode(row.location_id)}</strong>, sortValue: row => locationCode(row.location_id) },
+    { id: 'reason', header: 'Motivo', cell: row => row.reason },
+    { id: 'opened', header: 'Aberta em', cell: row => date.format(new Date(row.opened_at)), sortValue: row => row.opened_at },
+    { id: 'status', header: 'Situação', cell: row => row.closed_at
+      ? <Badge>Encerrada {date.format(new Date(row.closed_at))}</Badge> : <Badge tone="info">Aberta</Badge> },
+  ]
+  const decisionBadge = (row: CountRow) => row.decision === null ? <Badge tone="warning">Pendente</Badge>
+    : <Badge tone={String(row.decision).startsWith('APROV') ? 'success' : 'neutral'}>{String(row.decision).replaceAll('_', ' ')}</Badge>
+  const countColumns: Column<CountRow>[] = [
+    { id: 'lot', header: 'Lote', cell: row => <span className="ui-cell-stack"><strong>{row.lot?.original_lot}</strong><span className="ui-code">{row.lot?.internal_code}</span></span> },
+    { id: 'expected', header: 'Saldo registrado', align: 'end', cell: row => formatStockQuantity(String(row.expected_quantity)) + ' ' + (row.lot?.unit ?? '') },
+    { id: 'counted', header: 'Contagem', align: 'end', cell: row => <strong>{formatStockQuantity(String(row.counted_quantity))} {row.lot?.unit}</strong> },
+    { id: 'difference', header: 'Diferença', align: 'end', cell: row => {
+      const difference = Number(row.counted_quantity) - Number(row.expected_quantity)
+      return <Badge tone={difference === 0 ? 'success' : 'warning'}>{difference > 0 ? '+' : ''}{formatStockQuantity(String(difference))}</Badge>
+    } },
+    { id: 'decision', header: 'Decisão', cell: row => <span className="ui-cell-stack">{decisionBadge(row)}
+      <span>{row.reason}{row.review_reason && ' · ' + row.review_reason}</span></span> },
+  ]
+  const pendingCount = counts.data?.find(row => row.id === reviewing && row.decision === null)
+
+  return <section aria-labelledby="inventory-sessions-title">
+    <h2 id="inventory-sessions-title" className="sr-only">Sessões de inventário</h2>
+    {locations.length > 0 && <form className="ui-inline-form ui-session-open" onSubmit={async event => {
       event.preventDefault()
       const form = event.currentTarget
       const values = new FormData(form)
@@ -96,52 +125,48 @@ export function InventorySessions({ admin, busy, locations, mutate }: Props) {
         {locations.map(row => <option key={row.id} value={row.id}>{row.code}</option>)}
       </select></label>
       <label>Motivo <input name="reason" required/></label>
-      <button disabled={busy}>Abrir sessão</button>
+      <div><button disabled={busy}>Abrir sessão</button></div>
     </form>}
-    {sessions.isPending && <p role="status">Carregando sessões…</p>}
-    {sessions.isError && <p role="alert">Falha ao consultar sessões.</p>}
-    {sessions.data?.length === 0 && <p>Nenhuma sessão cadastrada.</p>}
-    {!!sessions.data?.length && <label>Sessões abertas e encerradas recentemente
-      <select value={selected} onChange={event => { setSelected(event.target.value); setError('') }}>
-        <option value="">Selecione</option>
-        {sessions.data.map(row => <option key={row.id} value={row.id}>
-          {locations.find(location => location.id === row.location_id)?.code ?? 'Local inativo'} · {date.format(new Date(row.opened_at))} · {row.closed_at ? 'Encerrada' : 'Aberta'}
-        </option>)}
-      </select>
-    </label>}
-    {session && <article>
-      <h3>{session.reason}</h3>
-      {session.closed_at && <p>Encerrada em {date.format(new Date(session.closed_at))} · {session.close_reason}</p>}
-      {!session.closed_at && <form onSubmit={addCount}>
+    {session && <article className="ui-detail" aria-labelledby="session-title">
+      <div className="ui-detail-header">
+        <div>
+          <h3 id="session-title">{locationCode(session.location_id)} · {session.reason}</h3>
+          <p className="ui-muted">Aberta em {date.format(new Date(session.opened_at))}
+            {session.closed_at && <> · encerrada em {date.format(new Date(session.closed_at))} · {session.close_reason}</>}</p>
+        </div>
+        <span className="ui-cell-stack">
+          {session.closed_at ? <Badge>Encerrada</Badge> : <Badge tone="info">Aberta</Badge>}
+          <button type="button" className="secondary" onClick={() => { setSelected(''); setReviewing('') }}><X aria-hidden="true" size={16}/>Fechar</button>
+        </span>
+      </div>
+      {!session.closed_at && <form className="ui-inline-form" onSubmit={addCount}>
         <label>Código interno do lote <input name="lot" autoComplete="off" required/></label>
         <label>Quantidade física na unidade base do lote <input name="amount" inputMode="decimal" pattern="[0-9]+([,.][0-9]{1,6})?" required/></label>
         <label>Motivo da contagem <input name="reason" required/></label>
-        <button disabled={busy || finding}>Registrar contagem na sessão</button>
+        <div><button disabled={busy || finding}>{finding ? 'Localizando…' : 'Registrar contagem'}</button></div>
       </form>}
-      {error && <p role="alert">{error}</p>}
-      {counts.isPending && <p role="status">Carregando contagens…</p>}
-      {counts.isError && <p role="alert">Falha ao consultar contagens.</p>}
-      {counts.data?.length === 0 && <p>Nenhuma contagem registrada nesta sessão.</p>}
-      {counts.data?.map(count => <article key={count.id}>
-        <h4>{count.lot?.original_lot} · {count.lot?.internal_code}</h4>
-        <p>Saldo registrado {formatStockQuantity(String(count.expected_quantity))} · Contagem {formatStockQuantity(String(count.counted_quantity))} {count.lot?.unit}</p>
-        <p>{count.reason} · {count.decision ?? 'PENDENTE'}{count.review_reason && ' · ' + count.review_reason}</p>
-        {admin && !count.decision && <form onSubmit={event => {
-          event.preventDefault()
-          const fields = new FormData(event.currentTarget)
-          void mutate('review_inventory_count', {
-            target_count: count.id, approve: fields.get('decision') === 'approve', reason: fields.get('reason'),
-          }, 'Revisão registrada.')
-        }}>
-          <label>Decisão <select name="decision" required><option value="">Selecione</option>
-            <option value="approve">Aprovar ajuste</option><option value="reject">Rejeitar contagem</option>
-          </select></label>
-          <label>Justificativa <input name="reason" required/></label>
-          <button disabled={busy}>Confirmar decisão</button>
-        </form>}
-      </article>)}
+      {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
+      {admin && pendingCount && <form className="ui-inline-form ui-session-review" onSubmit={async event => {
+        event.preventDefault()
+        const fields = new FormData(event.currentTarget)
+        if (await mutate('review_inventory_count', {
+          target_count: pendingCount.id, approve: fields.get('decision') === 'approve', reason: fields.get('reason'),
+        }, 'Revisão registrada.')) setReviewing('')
+      }}>
+        <p className="ui-muted">Revisão do lote <span className="ui-code">{pendingCount.lot?.internal_code}</span></p>
+        <label>Decisão <select name="decision" required><option value="">Selecione</option>
+          <option value="approve">Aprovar ajuste</option><option value="reject">Rejeitar contagem</option>
+        </select></label>
+        <label>Justificativa <input name="reason" required/></label>
+        <div><button disabled={busy}>Confirmar decisão</button> <button type="button" className="secondary" onClick={() => setReviewing('')}>Cancelar</button></div>
+      </form>}
+      <DataTable caption="Contagens da sessão" rows={counts.data} columns={countColumns} rowKey={row => row.id}
+        loading={counts.isPending} error={counts.isError} onRetry={() => void counts.refetch()}
+        empty={{ title: 'Nenhuma contagem registrada nesta sessão' }}
+        rowActions={admin && !session.closed_at ? row => row.decision === null
+          ? <button type="button" className="secondary" onClick={() => setReviewing(row.id)}>Revisar</button> : null : undefined}/>
       {admin && !session.closed_at && counts.data && counts.data.every(count => count.decision !== null) &&
-        <form onSubmit={event => {
+        <form className="ui-inline-form" onSubmit={event => {
           event.preventDefault()
           const fields = new FormData(event.currentTarget)
           void mutate('close_inventory_session', {
@@ -149,8 +174,14 @@ export function InventorySessions({ admin, busy, locations, mutate }: Props) {
           }, 'Sessão encerrada.')
         }}>
           <label>Motivo do encerramento <input name="reason" required/></label>
-          <button disabled={busy}>Encerrar sessão</button>
+          <div><button disabled={busy}>Encerrar sessão</button></div>
         </form>}
     </article>}
+    <DataTable caption="Sessões abertas e encerradas recentemente" rows={sessions.data} columns={sessionColumns} rowKey={row => row.id}
+      loading={sessions.isPending} error={sessions.isError} onRetry={() => void sessions.refetch()}
+      empty={{ title: 'Nenhuma sessão cadastrada', description: 'Abra uma sessão para contar os lotes de um local.' }}
+      onRowOpen={row => { setSelected(row.id); setError(''); setReviewing('') }}
+      rowActions={row => <button type="button" className="secondary" onClick={() => { setSelected(row.id); setError(''); setReviewing('') }}>
+        {row.closed_at ? 'Ver' : 'Contar'}</button>}/>
   </section>
 }

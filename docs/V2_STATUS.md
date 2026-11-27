@@ -15,8 +15,8 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 05. Arquitetura React | IMPLEMENTADO | `main.tsx`, `layouts`, `features`, `ui` | — | TypeScript, build | Carregamento por módulo, componentes reutilizáveis | — |
 | 06. AppShell e navegação | PUBLICADO | `AppShell.tsx`, `navigation.ts`, `routes.ts` | — | `routes.test.ts`, `appNavigation.test.ts` | Sidebar por departamento, recolhível, drawer, menu do usuário, status de conexão, rotas `#/modulo/<id>` | Validação autenticada em dispositivos reais |
 | 07. Busca global | PUBLICADO | `RecordSearch.tsx` | V2 004, 007 | Acentos, paginação, acesso por perfil | Ctrl+K, lotes por código | OPs, massadas, fornecedores e expedições |
-| 08. Padrão de buscas e filtros | PUBLICADO | `ui/filters.tsx`, módulos | V2 008 | `uiHelpers.test.ts`, `accentSearch.test.ts` | FilterBar, debounce, memória na sessão, períodos; busca sem acento no servidor; Expedição e Desperdícios | Rastreabilidade |
-| 09. Tabelas modernas | PUBLICADO | `ui/DataTable.tsx` | — | Build, capturas em 4 tamanhos | Produtos, Clientes, Pedidos, Estoque, Posição, Kanban (lista), Receitas, Expedição, Desperdícios, Cadastros operacionais | Rastreabilidade e Recolhimentos |
+| 08. Padrão de buscas e filtros | PUBLICADO | `ui/filters.tsx`, módulos | V2 008 | `uiHelpers.test.ts`, `accentSearch.test.ts` | FilterBar, debounce, memória na sessão, períodos; busca sem acento no servidor; Expedição e Desperdícios; Rastreabilidade por abas | — |
+| 09. Tabelas modernas | PUBLICADO | `ui/DataTable.tsx` | — | Build, capturas em 4 tamanhos | Produtos, Clientes, Pedidos, Estoque, Posição, Kanban (lista), Receitas, Expedição, Desperdícios, Cadastros operacionais, Rastreabilidade, Recolhimentos, Sessões de inventário | — |
 | 10. Formulários | PUBLICADO | `ui/Combobox.tsx`, `Customers.tsx`, `Orders.tsx`, `Inventory.tsx` | — | Validações SQL V1 | Combobox, seções, aviso de não salvo em Clientes; painéis de detalhe com formulários em Expedição, Cadastros e Perdas | Aviso de não salvo nos demais formulários |
 | 11. Dashboard executivo | PUBLICADO | `Dashboard.tsx`, `trend.ts` | V1 041 | `trend.test.ts`, Pareto, séries, exportações | Cards com tendência contra o período anterior e atalhos de detalhamento | Indicadores novos (ex.: produtividade por etapa) |
 | 12. Painéis departamentais | IMPLEMENTADO | `Dashboard.tsx` | V1 041 | Build | Abas Produção, Qualidade e estoque, Comercial | Indicadores específicos por departamento |
@@ -24,7 +24,7 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 14. Realtime | PUBLICADO | `useBoardRealtime.ts` | V2 002–003 | SQL homologação | Canal único, pausa em aba oculta | Teste entre dois dispositivos |
 | 15. Modo TV | PUBLICADO | `ProductionBoard.tsx` | V2 001–003 | Build | Gestão à vista | Indicadores e relógio |
 | 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx` | V1 029–039 | Capturas em tablet | Sidebar compacta, uma etapa por vez no celular | Terminal por estação, E2E em tablet |
-| 17. Estoque V2 | PUBLICADO | `features/inventory` | V1 003–010, 019, 034, 040 | `lotStatus.test.ts`, exportação | Lotes com filtros de situação e validade, ficha do lote pela URL, recebimento em seções, FEFO, posição por data | Inventário em sessões no novo padrão |
+| 17. Estoque V2 | PUBLICADO | `features/inventory` | V1 003–010, 019, 034, 040 | `lotStatus.test.ts`, exportação | Lotes com filtros de situação e validade, ficha do lote pela URL, recebimento em seções, FEFO, posição por data, sessões de inventário com revisão por linha | — |
 | 18. Pedidos V2 | PUBLICADO | `features/orders` | V1 012–023, 034; V2 008 | `uiHelpers.test.ts`, PDF | Lista com filtros, prazo, busca sem acento, Combobox; Expedição no novo padrão | — |
 | 19. Receitas V2 | PUBLICADO | `RecipeList.tsx`, `RecipeReview.tsx` | V1 025–028, 033 | Build | Lista com busca por ingrediente e situação | Criação de receita nova pela interface |
 | 20. Central de relatórios | PUBLICADO | `ReportCenter.tsx` | V1 009, 041 | PDF e Excel | Catálogo com filtros e prévia do painel | Relatórios adicionais |
@@ -32,7 +32,7 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 22. Usuários e permissões | PUBLICADO | `ProfileManagement.tsx` | V2 006 | SQL homologação | Gestão auditada de perfis e vínculo de contas | Convites pelo portal (Edge Function) |
 | 23. Recursos do Supabase | EM DESENVOLVIMENTO | Consultas, índices trigram | V2 001–008 | Advisors | Consultas paginadas, índices de busca | Medição de Egress e Realtime com uso real |
 | 24. Segurança | EM DESENVOLVIMENTO | RLS, RPCs | Todas | Advisor de produção (27/11) | Sem achados novos; `operation_requests` sem policy é intencional | Ativar proteção contra senhas vazadas no painel do Supabase (Auth) |
-| 25. Estados da interface | PUBLICADO | `src/ui` | — | Build | Skeleton, vazio, erro e acesso negado padronizados nos módulos atualizados | Módulos restantes |
+| 25. Estados da interface | PUBLICADO | `src/ui` | — | Build | Skeleton, vazio, erro e acesso negado padronizados nos módulos atualizados | Telas administrativas (perfis, importação, associações) |
 | 26. Acessibilidade | EM DESENVOLVIMENTO | `tokens.css`, `src/ui` | — | Teclado | Contraste AA nos tokens, foco visível, ARIA no Combobox e nas abas | Auditoria WCAG com leitor de tela |
 | 27. Testes automatizados | TESTADO | `tests`, `e2e/smoke.mjs` | V1 e V2 | 62 testes Vitest/PGlite; E2E autenticado com 3 perfis | Regressão local, migração com unaccent e E2E em homologação | Fluxos de escrita no E2E (pedido → OP → expedição) |
 | 28. Metas de performance | EM DESENVOLVIMENTO | Build Vite | — | Build | Logo de login caiu de 1,23 MB para WebP de 320 px | Medição autenticada V1/V2 |
