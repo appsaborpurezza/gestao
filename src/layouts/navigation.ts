@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BarChart3, History, Boxes, ClipboardList, Factory, FileBarChart, FlaskConical, Gauge, Link2, PackageSearch,
+  AlertTriangle, BarChart3, History, LayoutDashboard, Boxes, ClipboardList, Factory, FileBarChart, FlaskConical, Gauge, Link2, PackageSearch,
   Recycle, Settings2, ShieldAlert, ShoppingCart, Tablet, Tags, Truck, Tv, Upload, UserCog, Users, Workflow, type LucideIcon,
 } from 'lucide-react'
 
@@ -36,6 +36,7 @@ export const departments: Department[] = [
     { id: 'losses', title: 'Desperdícios', icon: Recycle },
   ] },
   { label: 'Gestão', entries: [
+    { id: 'panels', title: 'Painéis departamentais', icon: LayoutDashboard },
     { id: 'reports', title: 'Central de relatórios', icon: FileBarChart },
   ] },
   { label: 'Cadastros', entries: [
@@ -56,7 +57,7 @@ export const settingsIcon = Settings2
 const operational = new Set(['terminal', 'tv', 'production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
 const commercial = new Set(['orders', 'customers'])
 const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import', 'profiles', 'activity'])
-const shared = new Set(['dashboard', 'alerts', 'reports', 'products', 'production-board', 'shipping'])
+const shared = new Set(['dashboard', 'alerts', 'panels', 'reports', 'products', 'production-board', 'shipping'])
 
 /** Espelha as regras de acesso do servidor; o banco continua sendo a autoridade (RLS e RPCs). */
 export function canNavigate(id: string, role: string) {

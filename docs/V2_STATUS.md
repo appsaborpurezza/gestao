@@ -20,8 +20,8 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 08. Padrão de buscas e filtros | PUBLICADO | `ui/filters.tsx`, módulos | V2 008 | `uiHelpers.test.ts`, `accentSearch.test.ts` | FilterBar, debounce, memória na sessão, períodos; busca sem acento no servidor; Expedição e Desperdícios; Rastreabilidade por abas | — |
 | 09. Tabelas modernas | PUBLICADO | `ui/DataTable.tsx` | — | Build, capturas em 4 tamanhos | Produtos, Clientes, Pedidos, Estoque, Posição, Kanban (lista), Receitas, Expedição, Desperdícios, Cadastros operacionais, Rastreabilidade, Recolhimentos, Sessões de inventário | — |
 | 10. Formulários | PUBLICADO | `ui/Combobox.tsx`, `Customers.tsx`, `Orders.tsx`, `Inventory.tsx` | — | Validações SQL V1 | Combobox, seções, aviso de não salvo em Clientes; painéis de detalhe com formulários em Expedição, Cadastros e Perdas | Aviso de não salvo nos demais formulários |
-| 11. Dashboard executivo | PUBLICADO | `Dashboard.tsx`, `trend.ts` | V1 041 | `trend.test.ts`, Pareto, séries, exportações | Cards com tendência contra o período anterior e atalhos de detalhamento | Indicadores novos (ex.: produtividade por etapa) |
-| 12. Painéis departamentais | IMPLEMENTADO | `Dashboard.tsx` | V1 041 | Build | Abas Produção, Qualidade e estoque, Comercial | Indicadores específicos por departamento |
+| 11. Dashboard executivo | PUBLICADO | `Dashboard.tsx`, `trend.ts` | V1 041 | `trend.test.ts`, Pareto, séries, exportações | Cards com tendência contra o período anterior e atalhos de detalhamento | Produtividade por etapa entregue nos Painéis departamentais (01300) |
+| 12. Painéis departamentais | EM HOMOLOGAÇÃO | `panels/DepartmentPanels.tsx`, `panelData.ts` | V1 041, 01300 | `operationsPanels.test.ts` (4), `panelData.test.ts`, 66 verificações visuais em 5 resoluções e 3 perfis | Produção (planejado x realizado, rendimento por receita, produtividade e tempos líquidos por etapa, tempo do início à finalização), Estoque (situação, classificação, validade), Qualidade (perdas por motivo, destino e operação, peso abaixo do nominal, recolhimentos, liberação pendente), Comercial (pedidos, expedições, faturamento por cliente). Filtros reais por receita, cliente e classificação ao clicar nas tabelas; visualizações salvas; PDF, Excel e impressão por painel | Aplicar a migration 01300 em homologação e produção |
 | 13. Kanban | EM HOMOLOGAÇÃO | `ProductionBoard.tsx`, `boardQuery.ts` | V2 001–003, 01200 | `boardState.test.ts`, `productionBoardQuery.test.ts`, 60 verificações visuais em 5 resoluções | Cards compactos, cor por etapa, prazo, painel lateral, lista em DataTable; indicadores calculados no servidor e clicáveis; kg por coluna e por cartão; filtros combináveis (situação, prazo, entrega de/até, OP, busca); ordenação; visualizações salvas; aba Por OP com progresso do lote | Aplicar a migration 01200 em homologação e produção. Arrastar e soltar não se aplica (ver nota abaixo) |
 | 14. Realtime | PUBLICADO | `useBoardRealtime.ts` | V2 002–003 | SQL homologação | Canal único, pausa em aba oculta | Teste entre dois dispositivos |
 | 15. Modo TV | EM HOMOLOGAÇÃO | `TvBoard.tsx` | V2 001–003, 01200 | Verificação visual sem nomes de clientes | Totais do servidor (massadas e kg em produção, finalizadas hoje, atrasadas, pausadas ou bloqueadas) e kg por etapa; sem valores comerciais | — |
@@ -29,7 +29,7 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 17. Estoque V2 | PUBLICADO | `features/inventory` | V1 003–010, 019, 034, 040 | `lotStatus.test.ts`, exportação | Lotes com filtros de situação e validade, ficha do lote pela URL, recebimento em seções, FEFO, posição por data, sessões de inventário com revisão por linha | — |
 | 18. Pedidos V2 | PUBLICADO | `features/orders` | V1 012–023, 034; V2 008 | `uiHelpers.test.ts`, PDF | Lista com filtros, prazo, busca sem acento, Combobox; Expedição no novo padrão | — |
 | 19. Receitas V2 | PUBLICADO | `RecipeList.tsx`, `RecipeReview.tsx` | V1 025–028, 033 | Build | Lista com busca por ingrediente e situação | Criação de receita nova pela interface |
-| 20. Central de relatórios | PUBLICADO | `ReportCenter.tsx` | V1 009, 041 | PDF e Excel | Catálogo com filtros e prévia do painel | Relatórios adicionais |
+| 20. Central de relatórios | PUBLICADO | `ReportCenter.tsx` | V1 009, 041 | PDF e Excel | Catálogo com filtros e prévia do painel; relatórios individuais de Produção, Estoque, Qualidade e Comercial (abrem o painel certo, com PDF, Excel e impressão) | — |
 | 21. Alertas operacionais | PUBLICADO | `OperationalAlerts.tsx` | V2 005 | Smoke SQL | Cards por severidade com atalho | Abrir o registro exato |
 | 22. Usuários e permissões | PUBLICADO; convites IMPLEMENTADOS em homologação | `ProfileManagement.tsx`, `supabase/functions/admin-users` | V2 006 | SQL homologação; telas simuladas | Gestão auditada de perfis, vínculo de contas, convite, reenvio, revogação de convite pendente e redefinição de senha | Teste com login real e publicação da Edge Function em produção |
 | 23. Recursos do Supabase | EM DESENVOLVIMENTO | Consultas, índices trigram | V2 001–008 | Advisors | Consultas paginadas, índices de busca | Medição de Egress e Realtime com uso real |
@@ -45,6 +45,12 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 
 V1 001–041 refere-se à série `2026112400xxx`. V2 001–008 refere-se à série `20261127000x00`. Nomes exatos e ordenação estão em [supabase/migrations](../supabase/migrations).
 
+## Painéis e relatórios (Etapa 3)
+
+- `operations_panels(from_day, to_day, filters)` (migration 01300, somente leitura) calcula tudo no servidor. Filtros aceitos: `recipe`, `customer`, `classification`; qualquer outra chave é recusada (22023). Período máximo de 367 dias.
+- Produção, Estoque e Qualidade: ADMINISTRADOR e PRODUCAO. Comercial, com valores: ADMINISTRADOR e VENDAS. Produção nunca recebe valores comerciais.
+- Planejado x realizado considera as ordens com entrega no período; o realizado usa o peso medido ou, sem medição, o nominal. Rendimento compara o peso medido com o planejado só nas massadas medidas. Tempos por etapa são líquidos (pausas descontadas).
+- A Visão geral (executivo, `role_dashboard`) continua igual.
 ## Kanban v2 (Etapa 2)
 
 - `production_board_query(page_size, page_offsets, filters, sort)` substitui a leitura do quadro no frontend. Calcula no servidor os indicadores, os totais em kg, os grupos por OP e a paginação de cada coluna. `production_board_columns` continua disponível e não foi alterada.

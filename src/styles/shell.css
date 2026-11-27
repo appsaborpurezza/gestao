@@ -846,6 +846,10 @@ nav .shell-department[aria-expanded=false] svg { transform: rotate(-90deg); }
 .ui-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3);
   margin-block: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md, .5rem); background: var(--color-surface-muted, #f1f5f9); }
 .ui-bulk-bar strong { margin-inline-end: auto; }
+/* Painéis departamentais */
+.panel-filters { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-block: var(--space-2, 8px); }
+.panel-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--color-primary); border-radius: 999px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: var(--weight-semibold, 600); }
+.panel-hint { color: var(--color-text-muted); font-size: 0.875rem; margin-block: var(--space-3, 12px) 0; }
 /* Kanban v2: indicadores do servidor, filtros por situação, kg por coluna e visão por OP. */
 .board-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: var(--space-2); margin-block: var(--space-3); }
 .board-kpi { display: grid; justify-items: start; gap: 2px; padding: var(--space-2) var(--space-3); min-height: 0; text-align: start;
@@ -890,3 +894,16 @@ nav .shell-department[aria-expanded=false] svg { transform: rotate(-90deg); }
 .activity-list time { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .activity-list p { margin: 2px 0 0; color: var(--color-text-secondary, inherit); overflow-wrap: anywhere; }
 .overview-cards { display: grid; gap: var(--space-2, 8px); border: 0; padding: 0; margin: 0; }
+/* Receitas: linhas de ingredientes no formulário de nova receita. */
+.ui-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: var(--space-3, .75rem); }
+.recipe-line { display: grid; grid-template-columns: minmax(12rem, 2fr) minmax(8rem, 1.4fr) minmax(6rem, .8fr) minmax(6rem, .8fr) auto;
+  gap: var(--space-2, .5rem); align-items: end; padding-block: var(--space-2, .5rem); border-bottom: 1px solid var(--color-border, #e2e8f0); }
+.recipe-line .icon-button { margin-bottom: .25rem; }
+@media (max-width: 720px) { .recipe-line { grid-template-columns: 1fr 1fr; } .recipe-line > .ui-combobox { grid-column: 1 / -1; } }
+
+/* Seleção múltipla e barra de ações em massa. */
+.ui-select-cell { width: 2.5rem; text-align: center; }
+.ui-select-cell input { width: 1.125rem; height: 1.125rem; margin: 0; cursor: pointer; }
+.ui-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3);
+  margin-block: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius-md, .5rem); background: var(--color-surface-muted, #f1f5f9); }
+.ui-bulk-bar strong { margin-inline-end: auto; }
