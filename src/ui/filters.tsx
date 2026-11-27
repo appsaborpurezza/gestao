@@ -35,20 +35,26 @@ export function SearchInput({ value, onChange, label, placeholder }: {
   </label>
 }
 
-export function PeriodFilter({ value, onChange }: { value: Period & { preset?: PeriodPreset | 'custom' }; onChange: (value: Period & { preset?: PeriodPreset | 'custom' }) => void }) {
+export function PeriodFilter({ value, onChange, label = 'Período' }: {
+  value: Period & { preset?: string }; onChange: (value: Period & { preset?: string }) => void; label?: string
+}) {
+  const preset = value.preset || (value.from || value.to ? 'custom' : '')
   return <fieldset className="ui-period">
-    <legend className="sr-only">Período</legend>
+    <legend className="sr-only">{label}</legend>
     <CalendarRange aria-hidden="true" size={18}/>
-    <select aria-label="Período" value={value.preset ?? 'custom'} onChange={event => {
-      const preset = event.target.value as PeriodPreset | 'custom'
-      onChange(preset === 'custom' ? { ...value, preset } : { ...resolvePeriod(preset, todayInSaoPaulo()), preset })
+    <select aria-label={label} value={preset} onChange={event => {
+      const next = event.target.value
+      if (!next) onChange({ from: '', to: '', preset: '' })
+      else if (next === 'custom') onChange({ ...value, preset: 'custom' })
+      else onChange({ ...resolvePeriod(next as PeriodPreset, todayInSaoPaulo()), preset: next })
     }}>
-      {periodPresets.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-      <option value="custom">Período personalizado</option>
+      <option value="">{label}: qualquer data</option>
+      {periodPresets.map(([id, text]) => <option key={id} value={id}>{label}: {text.toLowerCase()}</option>)}
+      <option value="custom">{label}: período personalizado</option>
     </select>
-    {value.preset === 'custom' && <>
-      <input type="date" aria-label="Data inicial" value={value.from} max={value.to} onChange={event => onChange({ ...value, from: event.target.value })}/>
-      <input type="date" aria-label="Data final" value={value.to} min={value.from} onChange={event => onChange({ ...value, to: event.target.value })}/>
+    {preset === 'custom' && <>
+      <input type="date" aria-label={label + ' — data inicial'} value={value.from} max={value.to || undefined} onChange={event => onChange({ ...value, from: event.target.value, preset: 'custom' })}/>
+      <input type="date" aria-label={label + ' — data final'} value={value.to} min={value.from || undefined} onChange={event => onChange({ ...value, to: event.target.value, preset: 'custom' })}/>
     </>}
   </fieldset>
 }

@@ -563,3 +563,26 @@ th[aria-sort] .ui-sort { color: var(--color-primary); }
 @media (max-width: 600px) {
   .ui-filterbar-fields > select, .ui-filterbar-fields > .ui-period { flex: 1 1 100%; width: 100%; }
 }
+
+/* ---------- Formulários ---------- */
+.ui-form { display: grid; gap: var(--space-4); }
+.ui-form-header { display: flex; align-items: center; gap: var(--space-3); }
+.ui-form-header h2 { margin: 0; font-size: var(--text-xl); }
+.ui-form-header p { margin: 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.ui-fieldset { margin: 0; padding: var(--space-4) 0 0; border: 0; border-top: 1px solid var(--color-border); display: grid; gap: var(--space-4); }
+.ui-fieldset legend { padding: 0 var(--space-2) 0 0; font-weight: var(--weight-bold); color: var(--color-brand-navy); }
+.ui-form-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 calc(-1 * clamp(16px, 3vw, 32px)) calc(-1 * clamp(16px, 3vw, 32px));
+  padding: var(--space-3) clamp(16px, 3vw, 32px);
+  background: rgb(255 255 255 / 95%);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+.ui-form-dirty { margin-inline-end: auto; color: var(--color-warning-ink); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.ui-inline-error { padding: var(--space-3); border-radius: var(--radius-md); background: var(--color-danger-soft); }

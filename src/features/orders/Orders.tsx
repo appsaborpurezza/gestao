@@ -1,13 +1,31 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, FileText, Plus, ShoppingCart } from 'lucide-react'
+import { DataTable, type Column, type SortState } from '../../ui/DataTable'
+import { FilterBar, PeriodFilter, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
+import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+import { todayInSaoPaulo } from '../../lib/periods'
 import { supabase } from '../../lib/supabase'
 import { formatBrl as currency, formatStockQuantity } from '../../lib/decimal'
 import { OrderBilling } from './OrderBilling'
 import { CommercialDocumentButton, CommercialDocumentSettings } from './CommercialDocument'
 import { OrderReservations } from './OrderReservations'
+import { Combobox } from '../../ui/Combobox'
 const date = (value: string | null) => value?.split('-').reverse().join('/') ?? 'A definir'
-const pageSize = 20
 const statuses: Record<string, string> = { RASCUNHO: 'Rascunho', CONFIRMADO: 'Confirmado', PARCIAL: 'Parcial', EXPEDIDO: 'Expedido' }
+const statusTone: Record<string, 'neutral' | 'info' | 'warning' | 'success'> = { RASCUNHO: 'neutral', CONFIRMADO: 'info', PARCIAL: 'warning', EXPEDIDO: 'success' }
+type ListRow = { id: string; order_number: number; customer_name: string; delivery_date: string | null; fulfillment_status: string; issued_at: string }
+
+/** Situação do prazo: atraso só para pedidos ainda em atendimento (não confunde com prioridade). */
+export function deadlineState(row: Pick<ListRow, 'delivery_date' | 'fulfillment_status'>, today: string) {
+  if (!row.delivery_date || row.fulfillment_status === 'EXPEDIDO' || row.fulfillment_status === 'RASCUNHO') return null
+  if (row.delivery_date < today) return 'late'
+  const limit = new Date(today + 'T00:00:00Z')
+  limit.setUTCDate(limit.getUTCDate() + 2)
+  return row.delivery_date <= limit.toISOString().slice(0, 10) ? 'soon' : 'ok'
+}
+const emptyFilters = { term: '', status: '', period: { from: '', to: '', preset: '' }, page: 0, pageSize: 25,
+  sort: { column: 'order_number', direction: 'desc' } as SortState }
 
 type Product = { id: string; original_code: string; original_description: string; base_unit: string }
 type Client = { id: string; legal_name: string; customer_number: number }
@@ -47,6 +65,7 @@ function DraftForm({ products, customers, onClose, onSaved, draft }: {
     : [{ key: crypto.randomUUID(), product: '', line: undefined }])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [customerId, setCustomerId] = useState(draft?.customer_id ?? '')
   const pending = useRef<{ fingerprint: string; id: string } | null>(null)
   const inFlight = useRef(false)
   const cache = useQueryClient()
@@ -100,11 +119,12 @@ function DraftForm({ products, customers, onClose, onSaved, draft }: {
       <button onClick={onClose}>Voltar</button>
     </> : <form onSubmit={submit}>
       <div className="customer-fields">
-        <label>Cliente <select name="customer_id" required defaultValue={draft?.customer_id ?? ''}><option value="">Selecione</option>
-          {draft && !customers.some(customer => customer.id === draft.customer_id) &&
-            <option value={draft.customer_id} disabled>{draft.customer_name} · Inativo</option>}
-          {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.customer_number} · {customer.legal_name}</option>)}
-        </select></label>
+        <Combobox label="Cliente" name="customer_id" required value={customerId} onChange={setCustomerId}
+          options={[
+            ...(draft && !customers.some(customer => customer.id === draft.customer_id)
+              ? [{ value: draft.customer_id, label: draft.customer_name + ' · Inativo', disabled: true }] : []),
+            ...customers.map(customer => ({ value: customer.id, label: customer.legal_name, hint: 'Código ' + customer.customer_number })),
+          ]}/>
         <label>Previsão de entrega <input name="delivery_date" type="date" defaultValue={draft?.delivery_date ?? ''}/></label>
         <label>Condição de pagamento <input name="payment_terms" maxLength={254} defaultValue={draft?.finance?.payment_terms ?? ''}/></label>
         <label>Vencimento financeiro <input name="payment_due_date" type="date" defaultValue={draft?.finance?.payment_due_date ?? ''}/></label>
@@ -114,19 +134,14 @@ function DraftForm({ products, customers, onClose, onSaved, draft }: {
         const unit = row.line?.item_id === row.product ? row.line.unit : product?.base_unit
         return <fieldset key={row.key}><legend>Item {index + 1}</legend>
           <div className="customer-fields">
-            <label>Produto <select value={row.product} onChange={event => {
-              const selected = event.target.value
-              setRows(current => current.map(entry => entry.key === row.key ? { ...entry, product: selected } : entry))
-            }} required>
-              <option value="">Selecione</option>
-              {!product && row.line && row.product === row.line.item_id && <option value={row.product} disabled>
-                {row.line.item_code} · {row.line.description} (indisponível)
-              </option>}
-              {products.map(item => <option key={item.id} value={item.id}
-                disabled={rows.some(entry => entry.key !== row.key && entry.product === item.id)}>
-                {item.original_code} · {item.original_description}
-              </option>)}
-            </select></label>
+            <Combobox label="Produto" required value={row.product} onChange={selected =>
+              setRows(current => current.map(entry => entry.key === row.key ? { ...entry, product: selected } : entry))}
+              options={[
+                ...(!product && row.line && row.product === row.line.item_id
+                  ? [{ value: row.product, label: row.line.description + ' (indisponível)', hint: row.line.item_code, disabled: true }] : []),
+                ...products.map(item => ({ value: item.id, label: item.original_description, hint: item.original_code + ' · ' + item.base_unit,
+                  disabled: rows.some(entry => entry.key !== row.key && entry.product === item.id) })),
+              ]}/>
             <label>Quantidade {unit && '(' + unit + ')'} <input name={'quantity-' + row.key}
               defaultValue={row.line?.quantity.replace(/\.0+$/, '')} inputMode="decimal"
               pattern={unit === 'un' ? '[0-9]+' : '[0-9]+([,.][0-9]{1,6})?'} required/></label>
@@ -204,20 +219,35 @@ function ConfirmDraft({ draft }: { draft: Draft }) {
   </section>
 }
 
-export function Orders({ canRegisterBilling, initialOrder }: { canRegisterBilling: boolean; initialOrder?: string }) {
+export function Orders({ canRegisterBilling, initialOrder, onOpen }: { canRegisterBilling: boolean; initialOrder?: string; onOpen?: (id: string | null) => void }) {
   const [creating, setCreating] = useState(false)
   const [configuringDocument, setConfiguringDocument] = useState(false)
   const [editing, setEditing] = useState<Draft | undefined>()
-  const [selected, setSelected] = useState(initialOrder ?? '')
-  const [page, setPage] = useState(0)
+  const selected = initialOrder ?? ''
+  const setSelected = (id: string) => onOpen?.(id || null)
+  const [filters, setFilters] = useSessionState('orders', emptyFilters)
+  const term = useDebouncedValue(filters.term)
+  const today = todayInSaoPaulo()
+  const update = (patch: Partial<typeof filters>) => setFilters(current => ({ ...current, page: 0, ...patch }))
+  const activeFilters = [filters.term, filters.status, filters.period.from || filters.period.to].filter(Boolean).length
   const orders = useQuery({
-    queryKey: ['orders', 'list', page],
-    queryFn: async () => {
-      const { data, count, error } = await supabase.from('orders')
-        .select('id,order_number,customer_name,delivery_date,fulfillment_status', { count: 'exact' })
-        .order('order_number', { ascending: false }).range(page * pageSize, (page + 1) * pageSize - 1)
+    queryKey: ['orders', 'list', term, filters.status, filters.period.from, filters.period.to, filters.sort, filters.page, filters.pageSize, today],
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => {
+      const column = ['order_number', 'delivery_date', 'customer_name', 'issued_at'].includes(filters.sort?.column ?? '') ? filters.sort!.column : 'order_number'
+      const request = supabase.from('orders')
+        .select('id,order_number,customer_name,delivery_date,fulfillment_status,issued_at', { count: 'exact' })
+        .order(column, { ascending: filters.sort?.direction === 'asc', nullsFirst: false }).order('order_number', { ascending: false })
+        .range(filters.page * filters.pageSize, (filters.page + 1) * filters.pageSize - 1).abortSignal(signal)
+      const cleaned = term.replace(/[,()*\\%_]/g, ' ').trim()
+      if (cleaned) request.or(/^\d+$/.test(cleaned) ? `order_number.eq.${cleaned},customer_name.ilike.%${cleaned}%` : `customer_name.ilike.%${cleaned}%`)
+      if (filters.status === 'LATE') request.in('fulfillment_status', ['CONFIRMADO', 'PARCIAL']).lt('delivery_date', today)
+      else if (filters.status) request.eq('fulfillment_status', filters.status)
+      if (filters.period.from) request.gte('delivery_date', filters.period.from)
+      if (filters.period.to) request.lte('delivery_date', filters.period.to)
+      const { data, count, error } = await request
       if (error) throw error
-      return { data, count: count ?? 0 }
+      return { data: data as ListRow[], count: count ?? 0 }
     },
   })
   const options = useQuery({
@@ -247,8 +277,19 @@ export function Orders({ canRegisterBilling, initialOrder }: { canRegisterBillin
     },
   })
 
-  return <section className="panel">
-    <h1>Pedidos</h1>
+  const columns: Column<ListRow>[] = [
+    { id: 'order_number', header: 'Pedido', width: '7rem', align: 'end', sortValue: row => row.order_number, cell: row => <strong>#{row.order_number}</strong> },
+    { id: 'customer_name', header: 'Cliente', sortValue: row => row.customer_name, cell: row => row.customer_name },
+    { id: 'issued_at', header: 'Emissão', optional: true, sortValue: row => row.issued_at, cell: row => date(row.issued_at?.slice(0, 10) ?? null) },
+    { id: 'delivery_date', header: 'Entrega', sortValue: row => row.delivery_date, cell: row => {
+      const state = deadlineState(row, today)
+      return <span className="ui-cell-stack">{date(row.delivery_date)}
+        {state === 'late' && <Badge tone="danger">Atrasado</Badge>}{state === 'soon' && <Badge tone="warning">Próximo do prazo</Badge>}</span>
+    } },
+    { id: 'status', header: 'Situação comercial', cell: row => <Badge tone={statusTone[row.fulfillment_status] ?? 'neutral'}>{statuses[row.fulfillment_status] ?? row.fulfillment_status}</Badge> },
+  ]
+
+  return <section className={creating || editing || selected || configuringDocument ? 'panel' : undefined}>
     {configuringDocument ? <CommercialDocumentSettings onClose={() => setConfiguringDocument(false)}/> : creating || editing ? <>
       {options.isPending && <p role="status">Carregando clientes e produtos…</p>}
       {options.isError && <p role="alert">Falha ao consultar clientes e produtos. <button onClick={() => {
@@ -262,13 +303,13 @@ export function Orders({ canRegisterBilling, initialOrder }: { canRegisterBillin
       }} onSaved={id => {
         setCreating(false)
         setEditing(undefined)
-        setPage(0)
+        update({})
         setSelected(id)
       }}/>}
     </> : selected ? <>
-      <button className="secondary" onClick={() => setSelected('')}>Voltar aos pedidos</button>
-      {details.isPending && <p role="status">Carregando pedido…</p>}
-      {details.isError && <p role="alert">Falha ao consultar o pedido.</p>}
+      <button type="button" className="secondary" onClick={() => setSelected('')}><ArrowLeft aria-hidden="true" size={18}/>Voltar aos pedidos</button>
+      {details.isPending && <Skeleton lines={6} label="Carregando pedido…"/>}
+      {details.isError && <ErrorState title="Falha ao consultar o pedido" onRetry={() => void details.refetch()}/>}
       {details.data && <section>
         <h2>Pedido {details.data.order_number} · {details.data.customer_name}</h2>
         <p>Status: {statuses[details.data.fulfillment_status] ?? details.data.fulfillment_status}</p>
@@ -299,26 +340,30 @@ export function Orders({ canRegisterBilling, initialOrder }: { canRegisterBillin
           <CommercialDocumentButton key={details.data.id} orderId={details.data.id}/>}
       </section>}
     </> : <>
-      <button onClick={() => setCreating(true)}>Novo rascunho</button>
-      {!canRegisterBilling && <button className="secondary" type="button" onClick={() => setConfiguringDocument(true)}>
-        Dados do PDF comercial
-      </button>}
-      {orders.isPending && <p role="status">Carregando pedidos…</p>}
-      {orders.isError && <p role="alert">Falha ao consultar os pedidos.</p>}
-      {orders.data?.data.length === 0 && <p>Nenhum pedido cadastrado.</p>}
-      {!!orders.data?.data.length && <div className="table-scroll"><table>
-        <thead><tr><th>Número</th><th>Cliente</th><th>Entrega</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody>{orders.data.data.map(order => <tr key={order.id}>
-          <td>{order.order_number}</td><td>{order.customer_name}</td><td>{date(order.delivery_date)}</td>
-          <td>{statuses[order.fulfillment_status] ?? order.fulfillment_status}</td>
-          <td><button className="secondary" onClick={() => setSelected(order.id)}>Abrir<span className="sr-only"> pedido {order.order_number}</span></button></td>
-        </tr>)}</tbody>
-      </table></div>}
-      {orders.data && (orders.data.count > pageSize || page > 0) && <nav aria-label="Páginas de pedidos">
-        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-        <span>Página {page + 1} · {orders.data.count} pedidos</span>
-        <button type="button" disabled={(page + 1) * pageSize >= orders.data.count} onClick={() => setPage(page + 1)}>Próxima</button>
-      </nav>}
+      <PageHeader icon={ShoppingCart} title="Pedidos" description="Pedidos comerciais, do rascunho à expedição."
+        actions={<>
+          {!canRegisterBilling && <button className="secondary" type="button" onClick={() => setConfiguringDocument(true)}>
+            <FileText aria-hidden="true" size={18}/>Dados do PDF comercial</button>}
+          <button type="button" onClick={() => setCreating(true)}><Plus aria-hidden="true" size={18}/>Novo pedido</button>
+        </>}/>
+      <FilterBar activeCount={activeFilters} onClear={() => setFilters(emptyFilters)} onRefresh={() => void orders.refetch()} refreshing={orders.isFetching}>
+        <SearchInput label="Pesquisar por número do pedido ou cliente" value={filters.term} onChange={value => update({ term: value })}/>
+        <select aria-label="Situação" value={filters.status} onChange={event => update({ status: event.target.value })}>
+          <option value="">Todas as situações</option>
+          {Object.entries(statuses).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          <option value="LATE">Atrasados</option>
+        </select>
+        <PeriodFilter label="Entrega" value={filters.period} onChange={period => update({ period: { from: period.from, to: period.to, preset: period.preset ?? '' } })}/>
+      </FilterBar>
+      <DataTable caption="Pedidos" rows={orders.data?.data} columns={columns} rowKey={row => row.id}
+        loading={orders.isFetching} error={orders.isError} onRetry={() => void orders.refetch()}
+        total={orders.data?.count ?? 0} page={filters.page} pageSize={filters.pageSize}
+        onPageChange={page => setFilters(current => ({ ...current, page }))} onPageSizeChange={pageSize => update({ pageSize })}
+        sort={filters.sort} onSortChange={sort => update({ sort })} preferenceKey="orders"
+        filtered={activeFilters > 0} onClearFilters={() => setFilters(emptyFilters)}
+        empty={{ title: 'Nenhum pedido lançado', description: 'Crie o primeiro pedido para iniciar o fluxo comercial.' }}
+        onRowOpen={row => setSelected(row.id)}
+        rowActions={row => <button type="button" className="secondary" onClick={() => setSelected(row.id)}>Abrir<span className="sr-only"> pedido {row.order_number}</span></button>}/>
     </>}
   </section>
 }

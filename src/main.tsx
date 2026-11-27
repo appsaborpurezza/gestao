@@ -157,10 +157,12 @@ function Workspace({ userId }: { userId: string }) {
           <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
-          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}/>
+          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}
+            onOpen={id => navigate({ module: 'customers', recordId: id })}/>
         </Suspense>}
         {tab === 'orders' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo pedidos…</p>}>
-          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}/>
+          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}
+            onOpen={id => navigate({ module: 'orders', recordId: id })}/>
         </Suspense>}
         {tab === 'production-demand' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo demandas…</p>}>
           <ProductionDemand/>

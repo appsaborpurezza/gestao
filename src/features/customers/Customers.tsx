@@ -1,15 +1,29 @@
-import { useRef, useState, type FormEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Pencil, Plus, Save, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { DataTable, type Column, type SortState } from '../../ui/DataTable'
+import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
+import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+
+/** Monta um filtro `or` do PostgREST seguro para texto livre. */
+export function customerSearchFilter(term: string) {
+  const cleaned = term.replace(/[,()*]/g, ' ').replace(/[\\%_]/g, token => '\\' + token).trim().replace(/\s+/g, ' ')
+  if (!cleaned) return null
+  const digits = cleaned.replace(/\D/g, '')
+  const parts = ['legal_name', 'trade_name', 'city', 'contact_name'].map(field => `${field}.ilike.%${cleaned}%`)
+  if (digits.length >= 3) parts.push(`document.ilike.%${digits}%`)
+  if (/^\d+$/.test(cleaned)) parts.push(`customer_number.eq.${cleaned}`)
+  return parts.join(',')
+}
 
 const states = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ')
-const fields = [
-  ['trade_name', 'Nome fantasia'], ['state_registration', 'Inscrição estadual'], ['street', 'Logradouro'],
-  ['address_number', 'Número'], ['complement', 'Complemento'], ['district', 'Bairro'], ['city', 'Cidade'],
-  ['postal_code', 'CEP'], ['phone', 'Telefone'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail'],
-  ['contact_name', 'Pessoa de contato'], ['payment_terms', 'Condição de pagamento'],
-] as const
-const pageSize = 25
+const identity = [['trade_name', 'Nome fantasia'], ['state_registration', 'Inscrição estadual']] as const
+const address = [['postal_code', 'CEP'], ['street', 'Logradouro'], ['address_number', 'Número'], ['complement', 'Complemento'],
+  ['district', 'Bairro'], ['city', 'Cidade']] as const
+const contact = [['contact_name', 'Pessoa de contato'], ['phone', 'Telefone'], ['whatsapp', 'WhatsApp'], ['email', 'E-mail']] as const
+type Row = { id: string; customer_number: number; legal_name: string; trade_name: string | null; document: string | null
+  city: string | null; uf: string | null; payment_terms: string | null; active: boolean }
 
 type Existing = { id: string; version: number } & Record<string, string | boolean | number | null>
 
@@ -20,7 +34,23 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   const [kind, setKind] = useState(customer?.kind === 'PJ' ? 'PJ' : 'PF')
   const request = useRef<{ fingerprint: string; id: string } | null>(null)
   const inFlight = useRef(false)
+  const [dirty, setDirty] = useState(false)
   const value = (key: string) => String(customer?.[key] ?? '')
+  useEffect(() => {
+    if (!dirty) return
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault() }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+  const close = () => {
+    if (dirty && !window.confirm('Há alterações não salvas. Deseja descartá-las?')) return
+    onClose()
+  }
+  const input = (name: string, label: string) => <label key={name}>{label}
+    <input name={name} defaultValue={value(name)} maxLength={254} type={name === 'email' ? 'email'
+      : name === 'phone' || name === 'whatsapp' ? 'tel' : 'text'}
+      inputMode={name === 'postal_code' ? 'numeric' : undefined} autoComplete={name === 'email' ? 'email' : 'off'}/>
+  </label>
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -48,6 +78,7 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
         throw new Error(messages[error.code] ?? error.message)
       }
       await cache.invalidateQueries({ queryKey: ['customers'] })
+      setDirty(false)
       onClose()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao salvar o cliente.')
@@ -57,54 +88,90 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
     }
   }
 
-  return <section>
-    <h2>{customer ? 'Editar cliente' : 'Novo cliente'}</h2>
-    <form onSubmit={save}>
-      <div className="customer-fields">
-        <label>Tipo <select name="kind" value={kind} onChange={event => setKind(event.target.value)}>
-          <option value="PF">Pessoa física</option><option value="PJ">Pessoa jurídica</option>
-        </select></label>
-        <label>{kind === 'PF' ? 'Nome completo' : 'Razão social'}
-          <input name="legal_name" defaultValue={value('legal_name')} required maxLength={180}/>
-        </label>
-        <label>{kind === 'PF' ? 'CPF' : 'CNPJ'}
-          <input name="document" defaultValue={value('document')} maxLength={24} inputMode={kind === 'PF' ? 'numeric' : 'text'}/>
-        </label>
-        {fields.map(([name, label]) => <label key={name}>{label}
-          <input name={name} defaultValue={value(name)} maxLength={254} type={name === 'email' ? 'email'
-            : name === 'phone' || name === 'whatsapp' ? 'tel' : 'text'}/>
-        </label>)}
-        <label>UF <select name="uf" defaultValue={value('uf')}>
-          <option value="">Selecione</option>{states.map(state => <option key={state}>{state}</option>)}
-        </select></label>
-        <label>Prazo de pagamento em dias
-          <input name="payment_days" type="number" min="0" max="3650" step="1" defaultValue={value('payment_days')}/>
-        </label>
-      </div>
-      <label>Observações <textarea name="notes" maxLength={3000} defaultValue={value('notes')} rows={3}/></label>
-      <label className="customer-check"><input name="active" type="checkbox" defaultChecked={customer?.active !== false}/> Cliente ativo</label>
-      {error && <p role="alert">{error}</p>}
-      <div className="customer-actions">
-        <button disabled={busy}>{busy ? 'Salvando…' : 'Salvar cliente'}</button>
-        <button type="button" className="secondary" disabled={busy} onClick={onClose}>Voltar</button>
+  return <section className="panel ui-form">
+    <header className="ui-form-header">
+      <button type="button" className="icon-button" aria-label="Voltar para a lista" onClick={close}><ArrowLeft aria-hidden="true" size={20}/></button>
+      <div><h2>{customer ? 'Editar cliente' : 'Novo cliente'}</h2>
+        <p>{customer ? `Código ${value('customer_number')} · versão ${customer.version}` : 'Campos com * são obrigatórios.'}</p></div>
+    </header>
+    <form onSubmit={save} onChange={() => setDirty(true)} aria-busy={busy}>
+      <fieldset className="ui-fieldset">
+        <legend>Identificação</legend>
+        <div className="customer-fields">
+          <label>Tipo <span className="ui-required" aria-hidden="true">*</span><select name="kind" value={kind} onChange={event => setKind(event.target.value)}>
+            <option value="PF">Pessoa física</option><option value="PJ">Pessoa jurídica</option>
+          </select></label>
+          <label>{kind === 'PF' ? 'Nome completo' : 'Razão social'} <span className="ui-required" aria-hidden="true">*</span>
+            <input name="legal_name" defaultValue={value('legal_name')} required maxLength={180}/>
+          </label>
+          <label>{kind === 'PF' ? 'CPF' : 'CNPJ'}
+            <input name="document" defaultValue={value('document')} maxLength={24} inputMode={kind === 'PF' ? 'numeric' : 'text'}/>
+          </label>
+          {identity.map(([name, label]) => input(name, label))}
+        </div>
+      </fieldset>
+      <fieldset className="ui-fieldset">
+        <legend>Endereço</legend>
+        <div className="customer-fields">
+          {address.map(([name, label]) => input(name, label))}
+          <label>UF <select name="uf" defaultValue={value('uf')}>
+            <option value="">Selecione</option>{states.map(state => <option key={state}>{state}</option>)}
+          </select></label>
+        </div>
+      </fieldset>
+      <fieldset className="ui-fieldset">
+        <legend>Contato</legend>
+        <div className="customer-fields">{contact.map(([name, label]) => input(name, label))}</div>
+      </fieldset>
+      <fieldset className="ui-fieldset">
+        <legend>Condições comerciais</legend>
+        <div className="customer-fields">
+          {input('payment_terms', 'Condição de pagamento')}
+          <label>Prazo de pagamento em dias
+            <input name="payment_days" type="number" min="0" max="3650" step="1" defaultValue={value('payment_days')}/>
+          </label>
+        </div>
+        <label>Observações <textarea name="notes" maxLength={3000} defaultValue={value('notes')} rows={3}/></label>
+        <label className="customer-check"><input name="active" type="checkbox" defaultChecked={customer?.active !== false}/> Cliente ativo</label>
+      </fieldset>
+      {error && <p role="alert" className="ui-inline-error">{error}</p>}
+      <div className="ui-form-actions">
+        {dirty && !busy && <span className="ui-form-dirty" role="status">Alterações não salvas</span>}
+        <button type="button" className="secondary" disabled={busy} onClick={close}>Cancelar</button>
+        <button disabled={busy}><Save aria-hidden="true" size={18}/>{busy ? 'Salvando…' : 'Salvar cliente'}</button>
       </div>
     </form>
   </section>
 }
 
-export function Customers({ initialCustomer }: { initialCustomer?: string }) {
-  const [editor, setEditor] = useState<string | null>(initialCustomer ?? null)
-  const [page, setPage] = useState(0)
-  const [search, setSearch] = useState('')
+export function Customers({ initialCustomer, onOpen }: { initialCustomer?: string; onOpen?: (id: string | null) => void }) {
+  const [creating, setCreating] = useState(false)
+  const editor = creating ? 'new' : initialCustomer ?? null
+  const setEditor = (id: string | null) => {
+    setCreating(id === 'new')
+    if (id !== 'new') onOpen?.(id)
+  }
+  const [filters, setFilters] = useSessionState('customers', { term: '', status: 'active', uf: '', page: 0, pageSize: 25,
+    sort: { column: 'legal_name', direction: 'asc' } as SortState })
+  const term = useDebouncedValue(filters.term)
+  const activeFilters = [filters.term, filters.status !== 'active' ? filters.status : '', filters.uf].filter(Boolean).length
+  const update = (patch: Partial<typeof filters>) => setFilters(current => ({ ...current, page: 0, ...patch }))
   const list = useQuery({
-    queryKey: ['customers', 'list', search, page],
-    queryFn: async () => {
-      const request = supabase.from('customers').select('id,customer_number,legal_name,trade_name,city,uf,active', { count: 'exact' })
-        .order('legal_name').order('customer_number').range(page * pageSize, (page + 1) * pageSize - 1)
-      if (search) request.ilike('legal_name', '%' + search.replace(/[\\%_]/g, token => '\\' + token) + '%')
+    queryKey: ['customers', 'list', term, filters.status, filters.uf, filters.sort, filters.page, filters.pageSize],
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => {
+      const sortColumn = filters.sort?.column === 'customer_number' || filters.sort?.column === 'city' ? filters.sort.column : 'legal_name'
+      const request = supabase.from('customers')
+        .select('id,customer_number,legal_name,trade_name,document,city,uf,payment_terms,active', { count: 'exact' })
+        .order(sortColumn, { ascending: filters.sort?.direction !== 'desc' }).order('customer_number')
+        .range(filters.page * filters.pageSize, (filters.page + 1) * filters.pageSize - 1).abortSignal(signal)
+      const filter = customerSearchFilter(term)
+      if (filter) request.or(filter)
+      if (filters.status !== 'all') request.eq('active', filters.status === 'active')
+      if (filters.uf) request.eq('uf', filters.uf)
       const { data, count, error } = await request
       if (error) throw error
-      return { data, count: count ?? 0 }
+      return { data: data as Row[], count: count ?? 0 }
     },
   })
   const details = useQuery({
@@ -120,42 +187,46 @@ export function Customers({ initialCustomer }: { initialCustomer?: string }) {
     },
   })
 
-  return <section className="panel">
-    <h1>Clientes</h1>
-    {editor !== null ? <>
-      {editor === 'new' && <CustomerForm onClose={() => setEditor(null)}/>}
-      {editor !== 'new' && details.isFetching && !details.data && <p role="status">Carregando cliente…</p>}
-      {editor !== 'new' && details.isError && <p role="alert">Falha ao consultar o cliente. <button onClick={() => setEditor(null)}>Voltar</button></p>}
-      {editor !== 'new' && details.data && <CustomerForm key={editor + '/' + details.data.version}
-        customer={details.data} onClose={() => setEditor(null)}/>}
-    </> : <>
-      <button onClick={() => setEditor('new')}>Novo cliente</button>
-      <form onSubmit={event => {
-        event.preventDefault()
-        setPage(0)
-        setSearch(String(new FormData(event.currentTarget).get('search') ?? '').trim())
-      }}>
-        <label>Buscar por nome ou razão social <input name="search" type="search" defaultValue={search} maxLength={180}/></label>
-        <button>Buscar</button>
-      </form>
-      {list.isPending && <p role="status">Carregando clientes…</p>}
-      {list.isError && <p role="alert">Falha ao consultar clientes.</p>}
-      {list.data?.data.length === 0 && <p>Nenhum cliente encontrado.</p>}
-      {!!list.data?.data.length && <div className="table-scroll"><table>
-        <thead><tr><th>Código</th><th>Nome ou razão social</th><th>Cidade</th><th>Status</th><th>Ação</th></tr></thead>
-        <tbody>{list.data.data.map(customer => <tr key={customer.id}>
-          <td>{customer.customer_number}</td>
-          <td>{customer.legal_name}{customer.trade_name && <div>{customer.trade_name}</div>}</td>
-          <td>{[customer.city, customer.uf].filter(Boolean).join('/')}</td>
-          <td>{customer.active ? 'Ativo' : 'Inativo'}</td>
-          <td><button className="secondary" onClick={() => setEditor(customer.id)}>Editar<span className="sr-only"> {customer.legal_name}</span></button></td>
-        </tr>)}</tbody>
-      </table></div>}
-      {list.data && (list.data.count > pageSize || page > 0) && <nav aria-label="Páginas de clientes">
-        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-        <span>Página {page + 1} · {list.data.count} clientes</span>
-        <button type="button" disabled={(page + 1) * pageSize >= list.data.count} onClick={() => setPage(page + 1)}>Próxima</button>
-      </nav>}
-    </>}
+  if (editor === 'new') return <CustomerForm onClose={() => setEditor(null)}/>
+  if (editor) {
+    if (details.isError) return <ErrorState title="Falha ao consultar o cliente" description="O cliente pode não existir ou não estar disponível para o seu perfil."
+      onRetry={() => void details.refetch()}/>
+    if (!details.data) return <Skeleton lines={8} label="Carregando cliente…"/>
+    return <CustomerForm key={editor + '/' + details.data.version} customer={details.data} onClose={() => setEditor(null)}/>
+  }
+
+  const columns: Column<Row>[] = [
+    { id: 'customer_number', header: 'Código', width: '6rem', align: 'end', sortValue: row => row.customer_number, cell: row => row.customer_number },
+    { id: 'legal_name', header: 'Nome ou razão social', sortValue: row => row.legal_name, cell: row => <div className="ui-cell-stack">
+      <strong>{row.legal_name}</strong>{row.trade_name && <small>{row.trade_name}</small>}</div> },
+    { id: 'document', header: 'CPF/CNPJ', optional: true, cell: row => row.document ?? '—' },
+    { id: 'city', header: 'Cidade', optional: true, sortValue: row => row.city, cell: row => [row.city, row.uf].filter(Boolean).join('/') || '—' },
+    { id: 'payment_terms', header: 'Pagamento', optional: true, hiddenByDefault: true, cell: row => row.payment_terms ?? '—' },
+    { id: 'active', header: 'Situação', cell: row => <Badge tone={row.active ? 'success' : 'neutral'}>{row.active ? 'Ativo' : 'Inativo'}</Badge> },
+  ]
+
+  return <section>
+    <PageHeader icon={Users} title="Clientes" description="Cadastro comercial com CPF/CNPJ validado no servidor."
+      actions={<button type="button" onClick={() => setEditor('new')}><Plus aria-hidden="true" size={18}/>Novo cliente</button>}/>
+    <FilterBar activeCount={activeFilters} onClear={() => update({ term: '', status: 'active', uf: '' })}
+      onRefresh={() => void list.refetch()} refreshing={list.isFetching}>
+      <SearchInput label="Pesquisar por nome, fantasia, documento, cidade ou código" value={filters.term} onChange={value => update({ term: value })}/>
+      <select aria-label="Situação" value={filters.status} onChange={event => update({ status: event.target.value })}>
+        <option value="active">Somente ativos</option><option value="inactive">Somente inativos</option><option value="all">Ativos e inativos</option>
+      </select>
+      <select aria-label="UF" value={filters.uf} onChange={event => update({ uf: event.target.value })}>
+        <option value="">Todas as UFs</option>{states.map(state => <option key={state}>{state}</option>)}
+      </select>
+    </FilterBar>
+    <DataTable caption="Clientes" rows={list.data?.data} columns={columns} rowKey={row => row.id}
+      loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
+      total={list.data?.count ?? 0} page={filters.page} pageSize={filters.pageSize}
+      onPageChange={page => setFilters(current => ({ ...current, page }))} onPageSizeChange={pageSize => update({ pageSize })}
+      sort={filters.sort} onSortChange={sort => update({ sort })} preferenceKey="customers"
+      filtered={activeFilters > 0} onClearFilters={() => update({ term: '', status: 'active', uf: '' })}
+      empty={{ title: 'Nenhum cliente cadastrado', description: 'Cadastre o primeiro cliente para lançar pedidos.' }}
+      onRowOpen={row => setEditor(row.id)}
+      rowActions={row => <button type="button" className="secondary" onClick={() => setEditor(row.id)}>
+        <Pencil aria-hidden="true" size={16}/>Editar<span className="sr-only"> {row.legal_name}</span></button>}/>
   </section>
 }

@@ -103,7 +103,7 @@ export function DataTable<Row>(props: Props<Row>) {
   useEffect(() => { if (!serverMode && localPage > 0 && localPage >= pages) setLocalPage(pages - 1) }, [serverMode, localPage, pages])
 
   const toggleSort = (column: Column<Row>) => {
-    if (!column.sortValue && !props.onSortChange) return
+    if (!column.sortValue) return
     if (sort?.column !== column.id) setSort({ column: column.id, direction: 'asc' })
     else if (sort.direction === 'asc') setSort({ column: column.id, direction: 'desc' })
     else setSort(null)
@@ -152,7 +152,7 @@ export function DataTable<Row>(props: Props<Row>) {
           <caption className="sr-only">{caption}</caption>
           <thead><tr>
             {visible.map(column => {
-              const sortable = !!column.sortValue || !!props.onSortChange
+              const sortable = !!column.sortValue
               const active = sort?.column === column.id
               return <th key={column.id} scope="col" data-align={column.align} style={column.width ? { width: column.width } : undefined}
                 aria-sort={active ? (sort!.direction === 'asc' ? 'ascending' : 'descending') : undefined}>

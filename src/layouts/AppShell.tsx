@@ -6,6 +6,7 @@ import { canNavigate, departments, findEntry, roleLabels } from './navigation'
 export { canNavigate } from './navigation'
 
 const collapseKey = 'purezza:sidebar-collapsed'
+const compactQuery = '(max-width: 1180px)'
 const logo = (size: 64 | 128) => import.meta.env.BASE_URL + (size === 64 ? 'logo-64.png' : 'logo-128.webp')
 
 function initials(name?: string) {
@@ -22,7 +23,17 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
   onSignOut: () => Promise<void>
   children: ReactNode
 }) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(collapseKey) === '1')
+  const [preferCollapsed, setCollapsed] = useState(() => localStorage.getItem(collapseKey) === '1')
+  // Em tablets (até 1180 px) a sidebar fica compacta para liberar área de operação.
+  const [compactScreen, setCompactScreen] = useState(() => window.matchMedia(compactQuery).matches)
+  useEffect(() => {
+    const media = window.matchMedia(compactQuery)
+    const update = () => setCompactScreen(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+  const [expandedOnTablet, setExpandedOnTablet] = useState(false)
+  const collapsed = compactScreen ? !expandedOnTablet : preferCollapsed
   const [online, setOnline] = useState(() => navigator.onLine)
   const [signingOut, setSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState(false)
@@ -33,7 +44,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
   const [term, setTerm] = useState('')
   const current = findEntry(active)
 
-  useEffect(() => { localStorage.setItem(collapseKey, collapsed ? '1' : '0') }, [collapsed])
+  useEffect(() => { localStorage.setItem(collapseKey, preferCollapsed ? '1' : '0') }, [preferCollapsed])
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine)
@@ -89,7 +100,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
         <h2 className={compact ? 'sr-only' : undefined}>{department.label}</h2>
         {visible.map(({ id, title, icon: Icon }) => <button type="button" key={id} aria-current={active === id ? 'page' : undefined}
           title={compact ? title : undefined} aria-label={compact ? title : undefined}
-          onClick={() => { drawer.current?.close(); onNavigate(id) }}>
+          onClick={() => { drawer.current?.close(); setExpandedOnTablet(false); onNavigate(id) }}>
           <Icon aria-hidden="true" size={18}/><span className={compact ? 'sr-only' : undefined}>{title}</span>
         </button>)}
       </section>
@@ -109,7 +120,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
       </div>
       {navigation(collapsed)}
       <button type="button" className="shell-collapse" aria-controls="desktop-modules" aria-expanded={!collapsed}
-        onClick={() => setCollapsed(value => !value)}>
+        onClick={() => compactScreen ? setExpandedOnTablet(value => !value) : setCollapsed(value => !value)}>
         {collapsed ? <ChevronsRight aria-hidden="true" size={18}/> : <ChevronsLeft aria-hidden="true" size={18}/>}
         <span className={collapsed ? 'sr-only' : undefined}>{collapsed ? 'Expandir menu' : 'Recolher menu'}</span>
       </button>
