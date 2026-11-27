@@ -20,11 +20,11 @@ type View = 'stock' | 'receive' | 'opening' | 'position' | 'sessions'
 type LotFilters = { term: string; status: string; expiry: string }
 const emptyLotFilters: LotFilters = { term: '', status: '', expiry: '' }
 
-export function Inventory({ admin, release, initialLot, onOpen }: {
-  admin: boolean; release: boolean; initialLot?: string | null; onOpen?: (lotId: string | null) => void
+export function Inventory({ admin, release, initialLot, onOpen, startReceive = false }: {
+  admin: boolean; release: boolean; initialLot?: string | null; onOpen?: (lotId: string | null) => void; startReceive?: boolean
 }) {
   const cache = useQueryClient()
-  const [view, setView] = useState<View>('stock')
+  const [view, setView] = useState<View>(startReceive ? 'receive' : 'stock')
   const [filters, setFilters] = useSessionState<LotFilters>('inventory-lots', emptyLotFilters)
   // O lote aberto vem da URL quando há navegação; senão, fica no estado local.
   const [localLot, setLocalLot] = useState<string | null>(initialLot ?? null)

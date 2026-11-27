@@ -6,10 +6,12 @@ import { AppShell } from './layouts/AppShell'
 import type { RecordMatch } from './layouts/RecordSearch'
 import { Access } from './features/auth/Access'
 import { supabase } from './lib/supabase'
-import { useHashRoute } from './lib/routes'
+import { formatRoute, useHashRoute } from './lib/routes'
 import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
 import { Toaster } from './ui/toast'
+import { QuickActions } from './ui/QuickActions'
+import type { QuickAction } from './lib/workspace'
 import { RecipeList } from './features/recipes/RecipeList'
 import { ProductCatalog } from './features/products/ProductCatalog'
 import './styles/tokens.css'
@@ -50,6 +52,19 @@ function Workspace({ userId }: { userId: string }) {
   const setTarget = (record: RecordMatch | null) => {
     setTargetMeta(record)
     navigate(record ? { module: record.module, recordId: record.record_id } : { module: route.module, recordId: null })
+  }
+  // Ações rápidas (ex.: #/orders/novo) abrem o formulário uma vez; o endereço volta ao módulo
+  // para que atualizar a página não reabra o formulário. O contador remonta a tela a cada pedido.
+  const [actionRun, setActionRun] = useState(0)
+  const action = route.action
+  const actionKey = action ? `${action}:${actionRun}` : 'list'
+  useEffect(() => {
+    if (route.action) history.replaceState(null, '', formatRoute({ module: route.module, recordId: null }))
+  }, [route])
+  const runQuick = (quick: QuickAction) => {
+    setTargetMeta(null)
+    setActionRun(value => value + 1)
+    navigate({ module: quick.module, recordId: null, action: quick.action })
   }
   const [unitItem, setUnitItem] = useState<string | null>(null)
   const [recipeReview, setRecipeReview] = useState<{ id: string; title: string } | null>(null)
@@ -92,6 +107,7 @@ function Workspace({ userId }: { userId: string }) {
 
   return <AppShell active={tab} role={role} name={profile.data?.display_name} accountScope={`${userId}:${role}`}
     onNavigate={id => { setTargetMeta(null); setTab(id) }}
+    onAction={runQuick}
     onOpenRecord={record => {
       setUnitItem(null)
       setRecipeReview(null)
@@ -106,7 +122,8 @@ function Workspace({ userId }: { userId: string }) {
       {profile.isSuccess && !profile.data && <ForbiddenState description="Esta conta precisa de um perfil ativo. Procure a administração."/>}
       {role && !canNavigate(tab, role) && <ForbiddenState description="Este endereço não existe ou não está disponível para o seu perfil."/>}
       {profile.data && <>
-        {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} onNavigate={setTab}/></Suspense>}
+        {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} onNavigate={setTab}
+          quickActions={role && <QuickActions role={role} onAction={runQuick}/>}/></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
@@ -119,7 +136,7 @@ function Workspace({ userId }: { userId: string }) {
         {tab === 'products' && <section>
           {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<Skeleton lines={4} label="Abrindo configuração…"/>}>
             <ProductUnits key={productForUnits.id} product={productForUnits} onClose={() => setUnitItem(null)}/>
-          </Suspense> : <ProductCatalog items={catalog.data} loading={catalog.isFetching} error={catalog.isError}
+          </Suspense> : <ProductCatalog key={actionKey} startNew={action === 'novo'} items={catalog.data} loading={catalog.isFetching} error={catalog.isError}
             onRetry={() => void catalog.refetch()} canConfigure={role === 'ADMINISTRADOR'} onConfigure={setUnitItem}
             focused={target?.module === 'products'} onShowAll={() => { setUnitItem(null); setTarget(null) }}/>}
         </section>}
@@ -138,18 +155,18 @@ function Workspace({ userId }: { userId: string }) {
           <RecipeAssignments/>
         </Suspense>}
         {tab === 'operational-catalog' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo cadastros…</p>}>
-          <OperationalCatalogs/>
+          <OperationalCatalogs key={actionKey} startNew={action === 'novo'}/>
         </Suspense>}
         {tab === 'inventory' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo estoque…</p>}>
-          <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}
+          <Inventory key={actionKey} startReceive={action === 'receber'} admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}
             initialLot={target?.record_id} onOpen={id => navigate({ module: 'inventory', recordId: id })}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
-          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id} admin={role === 'ADMINISTRADOR'}
+          <Customers key={target?.record_id ?? 'customers:' + actionKey} startNew={action === 'novo'} initialCustomer={target?.record_id} admin={role === 'ADMINISTRADOR'}
             onOpen={id => navigate({ module: 'customers', recordId: id })}/>
         </Suspense>}
         {tab === 'orders' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo pedidos…</p>}>
-          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}
+          <Orders key={target?.record_id ?? 'orders:' + actionKey} startNew={action === 'novo'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}
             onOpen={id => navigate({ module: 'orders', recordId: id })}/>
         </Suspense>}
         {tab === 'production-demand' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo demandas…</p>}>
@@ -169,7 +186,7 @@ function Workspace({ userId }: { userId: string }) {
           <Recall canOpen={role === 'ADMINISTRADOR'} canResolve={role === 'ADMINISTRADOR' && profile.data.can_release_lot}/>
         </Suspense>}
         {tab === 'losses' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo desperdícios…</p>}>
-          <Losses admin={role === 'ADMINISTRADOR'} canAuthorize={profile.data.can_release_lot}/>
+          <Losses key={actionKey} startRegister={action === 'registrar'} admin={role === 'ADMINISTRADOR'} canAuthorize={profile.data.can_release_lot}/>
         </Suspense>}
       </>}
   </AppShell>

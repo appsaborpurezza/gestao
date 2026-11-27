@@ -220,8 +220,8 @@ function ConfirmDraft({ draft }: { draft: Draft }) {
   </section>
 }
 
-export function Orders({ canRegisterBilling, initialOrder, onOpen }: { canRegisterBilling: boolean; initialOrder?: string; onOpen?: (id: string | null) => void }) {
-  const [creating, setCreating] = useState(false)
+export function Orders({ canRegisterBilling, initialOrder, onOpen, startNew = false }: { canRegisterBilling: boolean; initialOrder?: string; onOpen?: (id: string | null) => void; startNew?: boolean }) {
+  const [creating, setCreating] = useState(startNew)
   const [configuringDocument, setConfiguringDocument] = useState(false)
   const [editing, setEditing] = useState<Draft | undefined>()
   const selected = initialOrder ?? ''

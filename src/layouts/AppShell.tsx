@@ -1,7 +1,26 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bell, ChevronsLeft, ChevronsRight, LogOut, Menu, Search, Wifi, WifiOff, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Clock3, LogOut, Menu, Search, Star, Wifi, WifiOff, X, Zap } from 'lucide-react'
 import { RecordSearch, type RecordMatch } from './RecordSearch'
-import { canNavigate, departments, findEntry, roleLabels } from './navigation'
+import { canNavigate, departments, findEntry, roleLabels, type NavEntry } from './navigation'
+import { actionsFor, pushRecent, toggleDepartment, toggleFavorite, useWorkspacePrefs, type QuickAction } from '../lib/workspace'
+import { highlightParts, normalizeText } from '../lib/text'
+
+function Marked({ text, term }: { text: string; term: string }) {
+  return <>{highlightParts(text, term).map((part, index) => part.match ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>)}</>
+}
+
+/** Setas, Home e End percorrem os itens da paleta; Enter abre. */
+function paletteKeys(event: React.KeyboardEvent<HTMLElement>) {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-palette]')]
+  if (!items.length) return
+  event.preventDefault()
+  const index = items.indexOf(document.activeElement as HTMLButtonElement)
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+    : event.key === 'ArrowDown' ? Math.min(index + 1, items.length - 1) : index <= 0 ? -1 : index - 1
+  if (next < 0) event.currentTarget.querySelector<HTMLInputElement>('input')?.focus()
+  else items[next]?.focus()
+}
 
 export { canNavigate } from './navigation'
 
@@ -13,12 +32,13 @@ function initials(name?: string) {
   return (name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('') || '?'
 }
 
-export function AppShell({ active, name, role, accountScope, onNavigate, onOpenRecord, onSignOut, children }: {
+export function AppShell({ active, name, role, accountScope, onNavigate, onAction, onOpenRecord, onSignOut, children }: {
   active: string
   name?: string
   role?: string
   accountScope: string
   onNavigate: (id: string) => void
+  onAction?: (action: QuickAction) => void
   onOpenRecord: (record: RecordMatch) => void
   onSignOut: () => Promise<void>
   children: ReactNode
@@ -43,6 +63,11 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
   const userMenuRef = useRef<HTMLDivElement>(null)
   const [term, setTerm] = useState('')
   const current = findEntry(active)
+  const user = accountScope.split(':')[0] ?? 'anon'
+  const prefs = useWorkspacePrefs(user)
+  const allowed = (id: string) => !!role && canNavigate(id, role)
+  const favorite = prefs.favorites.includes(active)
+  useEffect(() => { if (role && canNavigate(active, role)) pushRecent(user, active) }, [active, role, user])
 
   useEffect(() => { localStorage.setItem(collapseKey, preferCollapsed ? '1' : '0') }, [preferCollapsed])
 
@@ -88,21 +113,44 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
     try { await onSignOut() } catch { setSignOutError(true) } finally { setSigningOut(false) }
   }
 
-  const normalize = (value: string) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+  const needle = normalizeText(term)
   const matching = role ? departments.flatMap(group => group.entries.filter(entry =>
-    canNavigate(entry.id, role) && normalize(entry.title).includes(normalize(term.trim())))) : []
+    canNavigate(entry.id, role) && normalizeText(entry.title + ' ' + group.label).includes(needle))) : []
+  const actions = role ? actionsFor(role).filter(action => canNavigate(action.module, role)
+    && normalizeText(action.title + ' ' + action.hint).includes(needle)) : []
+  const recents = prefs.recents.filter(id => id !== active && allowed(id)).map(id => findEntry(id)?.entry).filter((entry): entry is NavEntry => !!entry).slice(0, 5)
+  const favoriteEntries = prefs.favorites.filter(allowed).map(id => findEntry(id)?.entry).filter((entry): entry is NavEntry => !!entry)
+  const runAction = (action: QuickAction) => {
+    search.current?.close()
+    if (onAction) onAction(action)
+    else onNavigate(action.module)
+  }
+  const go = (id: string) => { drawer.current?.close(); setExpandedOnTablet(false); onNavigate(id) }
+  const navButton = (compact: boolean) => ({ id, title, icon: Icon }: NavEntry) => <button type="button" key={id}
+    aria-current={active === id ? 'page' : undefined} title={compact ? title : undefined} aria-label={compact ? title : undefined}
+    onClick={() => go(id)}>
+    <Icon aria-hidden="true" size={18}/><span className={compact ? 'sr-only' : undefined}>{title}</span>
+  </button>
 
   const navigation = (compact: boolean) => role && <nav aria-label="Módulos">
+    {favoriteEntries.length > 0 && <section className="shell-favorites">
+      <h2 className={compact ? 'sr-only' : undefined}><Star aria-hidden="true" size={12}/> Favoritos</h2>
+      {favoriteEntries.map(navButton(compact))}
+    </section>}
     {departments.map(department => {
       const visible = department.entries.filter(entry => canNavigate(entry.id, role))
       if (!visible.length) return null
-      return <section key={department.label}>
-        <h2 className={compact ? 'sr-only' : undefined}>{department.label}</h2>
-        {visible.map(({ id, title, icon: Icon }) => <button type="button" key={id} aria-current={active === id ? 'page' : undefined}
-          title={compact ? title : undefined} aria-label={compact ? title : undefined}
-          onClick={() => { drawer.current?.close(); setExpandedOnTablet(false); onNavigate(id) }}>
-          <Icon aria-hidden="true" size={18}/><span className={compact ? 'sr-only' : undefined}>{title}</span>
-        </button>)}
+      // Departamento recolhido continua mostrando a página ativa, para não perder a referência.
+      const closed = !compact && prefs.closedDepartments.includes(department.label)
+      const shown = closed ? visible.filter(entry => entry.id === active) : visible
+      const headingId = 'dep-' + normalizeText(department.label).replace(/\W+/g, '-') + (compact ? '-c' : '')
+      return <section key={department.label} aria-labelledby={headingId}>
+        {compact ? <h2 id={headingId} className="sr-only">{department.label}</h2>
+          : <h2 id={headingId}><button type="button" className="shell-department" aria-expanded={!closed}
+            onClick={() => toggleDepartment(user, department.label)}>
+            {department.label}<ChevronDown aria-hidden="true" size={14}/>
+          </button></h2>}
+        {shown.map(navButton(compact))}
       </section>
     })}
   </nav>
@@ -133,6 +181,11 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
         {current
           ? <nav aria-label="Localização" className="shell-breadcrumb"><span>{current.department.label}</span><span aria-hidden="true">/</span><strong aria-current="page">{current.entry.title}</strong></nav>
           : <strong>Sabor Purezza SMART</strong>}
+        {current && allowed(active) && <button type="button" className="icon-button shell-favorite" aria-pressed={favorite}
+          aria-label={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'} title={favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          onClick={() => toggleFavorite(user, active)}>
+          <Star aria-hidden="true" size={16} fill={favorite ? 'currentColor' : 'none'}/>
+        </button>}
       </div>
       {role && <button type="button" className="shell-search-control" aria-haspopup="dialog"
         onClick={() => search.current?.showModal()}>
@@ -169,17 +222,33 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
       {navigation(false)}
     </dialog>
 
-    <dialog ref={search} className="shell-search" aria-label="Busca global" onClose={() => setTerm('')}>
+    <dialog ref={search} className="shell-search" aria-label="Busca global" onClose={() => setTerm('')} onKeyDown={paletteKeys}>
       <div className="shell-search-field">
         <Search aria-hidden="true" size={18}/>
         <input type="search" aria-label="Buscar módulos e registros" placeholder="Buscar módulos e registros"
           maxLength={100} autoFocus value={term} onChange={event => setTerm(event.target.value)}/>
         <button type="button" className="icon-button" aria-label="Fechar busca" onClick={() => search.current?.close()}><X aria-hidden="true" size={18}/></button>
       </div>
+      {actions.length > 0 && <>
+        <h3>Ações</h3>
+        <ul>{actions.map(action => <li key={action.id}>
+          <button type="button" className="secondary" data-palette onClick={() => runAction(action)}>
+            <Zap aria-hidden="true" size={16}/><span><Marked text={action.title} term={term}/></span><small>{action.hint}</small>
+          </button>
+        </li>)}</ul>
+      </>}
+      {!needle && recents.length > 0 && <>
+        <h3>Recentes</h3>
+        <ul>{recents.map(({ id, title }) => <li key={id}>
+          <button type="button" className="secondary" data-palette onClick={() => { search.current?.close(); onNavigate(id) }}>
+            <Clock3 aria-hidden="true" size={16}/>{title}
+          </button>
+        </li>)}</ul>
+      </>}
       <h3>Módulos</h3>
       {matching.length ? <ul>{matching.map(({ id, title, icon: Icon }) => <li key={id}>
-        <button type="button" className="secondary" onClick={() => { search.current?.close(); onNavigate(id) }}>
-          <Icon aria-hidden="true" size={16}/>{title}
+        <button type="button" className="secondary" data-palette onClick={() => { search.current?.close(); onNavigate(id) }}>
+          <Icon aria-hidden="true" size={16}/><span><Marked text={title} term={term}/></span>
         </button>
       </li>)}</ul> : <p role="status">Nenhum módulo encontrado.</p>}
       {role && <RecordSearch term={term} accountScope={accountScope} onOpen={record => {

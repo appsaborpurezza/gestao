@@ -185,9 +185,9 @@ type Report = {
 type LossRow = Report['rows'][number]
 type Panel = 'register' | 'config' | null
 
-export function Losses({ admin, canAuthorize }: { admin: boolean; canAuthorize: boolean }) {
+export function Losses({ admin, canAuthorize, startRegister = false }: { admin: boolean; canAuthorize: boolean; startRegister?: boolean }) {
   const [view, setView] = useState<'mass' | 'stock'>('mass')
-  const [panel, setPanel] = useState<Panel>(null)
+  const [panel, setPanel] = useState<Panel>(startRegister ? 'register' : null)
   const today = localDay()
   const initial = { from_day: today, to_day: today, filter_reason: null as string | null }
   const [filter, setFilter] = useState(initial)

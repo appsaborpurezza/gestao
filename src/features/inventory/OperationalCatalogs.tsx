@@ -81,10 +81,10 @@ function CatalogForm({ catalog, entry, onDirty, onSaved }: {
   </form>
 }
 
-export function OperationalCatalogs() {
+export function OperationalCatalogs({ startNew = false }: { startNew?: boolean } = {}) {
   const cache = useQueryClient()
   const [catalog, setCatalog] = useState<Catalog>('FORNECEDOR')
-  const [editor, setEditor] = useState<Row | null | undefined>()
+  const [editor, setEditor] = useState<Row | null | undefined>(startNew ? null : undefined)
   const [dirty, setDirty] = useState(false)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<Status>('TODOS')
