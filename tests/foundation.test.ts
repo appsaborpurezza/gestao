@@ -68,6 +68,8 @@ beforeAll(async () => {
     '20261124004000_stock_waste.sql',
     '20261124004100_role_dashboard.sql',
     '20261127000100_production_board_columns.sql',
+    '20261127000200_production_board_realtime.sql',
+    '20261127000300_production_board_revision.sql',
   ]) {
     await db.exec(await migration(name))
   }

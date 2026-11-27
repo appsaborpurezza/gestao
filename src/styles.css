@@ -64,6 +64,27 @@ textarea { padding: 9px; border: 1px solid #8196a8; border-radius: 8px; font: in
   border-radius: .5rem;
   background: #e6f0f8;
 }
+.board-tv {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  padding: clamp(.75rem, 3vw, 2.5rem);
+  border: 0;
+  color: var(--text);
+  background: var(--canvas);
+}
+.board-tv header { padding: .75rem; }
+.board-tv header h2 { margin: 0; }
+.board-tv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+}
+.board-tv-grid section { padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.board-tv-grid h3 { margin: 0; color: var(--brand-navy); }
+.board-tv-grid strong { font-size: clamp(1.5rem, 5vw, 3rem); }
+.board-tv-grid ul { padding-left: 1.25rem; }
 .batch-card { background: white; border: 1px solid #dce4ec; border-radius: 8px; margin: 8px 0; padding: 12px; overflow-wrap: anywhere; }
 .batch-card h3 { font-size: .95rem; margin: 0 0 4px; }
 .batch-card p { margin: 4px 0; }

@@ -6,6 +6,7 @@ import { StageResult } from './StageResult'
 import { BatchPackaging } from './BatchPackaging'
 import { formatStageDuration, StagePauseControl, StageTiming } from './StageTiming'
 import { MassLossForm, type LossOperation } from './Losses'
+import { useBoardRealtime } from './useBoardRealtime'
 
 const columns = [
   ['PLANEJADA', 'Pedidos'],
@@ -108,10 +109,12 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
 }
 
 export function ProductionBoard({ canStart }: { canStart: boolean }) {
+  const realtime = useBoardRealtime()
   const [offsets, setOffsets] = useState<Partial<Record<Stage, number>>>({})
   const [column, setColumn] = useState<Stage>('PLANEJADA')
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
+  const tv = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (input.trim() !== search) {
@@ -124,7 +127,7 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
   const board = useQuery({
     queryKey: ['production-board', 'columns', search, offsets],
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
+    refetchInterval: realtime ? 300_000 : 60_000,
     queryFn: async ({ signal }) => {
       const { data, error } = await supabase.rpc('production_board_columns', {
         page_size: pageSize, page_offsets: offsets, search,
@@ -136,6 +139,8 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
 
   return <section className="panel">
     <h1>Quadro de produção</h1>
+    <p role="status">{realtime ? 'Atualização em tempo real' : 'Atualização periódica'}
+      {board.dataUpdatedAt > 0 && ' · Última consulta ' + dateTime.format(board.dataUpdatedAt)}</p>
     <div className="customer-fields">
       <label>Buscar massadas
         <input type="search" maxLength={100} value={input} onChange={event => setInput(event.target.value)}
@@ -146,6 +151,8 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
           onClick={() => { setInput(''); setSearch(''); setOffsets({}) }}>Limpar filtros</button>
         <button type="button" className="secondary" disabled={board.isFetching}
           onClick={() => void board.refetch()}>Atualizar quadro</button>
+        {canStart && <button type="button" className="secondary" disabled={!board.data}
+          aria-haspopup="dialog" onClick={() => tv.current?.showModal()}>Gestão à vista</button>}
       </div>
     </div>
     {board.isPending && <p role="status">Carregando massadas…</p>}
@@ -172,5 +179,30 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
         })}
       </div>
     </>}
+    {canStart && <dialog ref={tv} className="board-tv" aria-labelledby="board-tv-title">
+      <header>
+        <img className="shell-logo" src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas" width={56} height={56}/>
+        <h2 id="board-tv-title">Gestão à vista · Produção</h2>
+        <button type="button" className="secondary" onClick={() => tv.current?.close()}>Fechar gestão à vista</button>
+      </header>
+      <p role="status">{realtime ? 'Tempo real' : 'Atualização periódica'}
+        {board.dataUpdatedAt > 0 && ' · Última consulta ' + dateTime.format(board.dataUpdatedAt)}
+        {search && ' · Consulta filtrada'}</p>
+      {board.isError && <p role="alert">Dados indisponíveis. O quadro tentará atualizar automaticamente.</p>}
+      {board.data && <div className="board-tv-grid">
+        {columns.map(([stage, title]) => {
+          const { total, rows } = board.data[stage]
+          return <section key={stage}>
+            <h3>{title}</h3>
+            <p><strong>{total}</strong> {total === 1 ? 'massada' : 'massadas'}</p>
+            {rows.length > 0 && <ul>{rows.map(batch => <li key={batch.id}>
+              OP {batch.production_number} · {batch.sequence}/{batch.batches_count}
+              {batch.recalled ? ' · Bloqueada' : batch.stage_status === 'PAUSADA' ? ' · Pausada' : ''}
+            </li>)}</ul>}
+            {rows.length < total && <small>Exibindo {rows.length} de {total}</small>}
+          </section>
+        })}
+      </div>}
+    </dialog>}
   </section>
 }
