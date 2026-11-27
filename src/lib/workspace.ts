@@ -75,3 +75,22 @@ export const quickActions: QuickAction[] = [
 ]
 
 export const actionsFor = (role: string) => quickActions.filter(action => action.roles.includes(role))
+
+/** Usuário atual do workspace, definido pelo AppShell; separa preferências entre contas no mesmo navegador. */
+let workspaceUser = 'anon'
+export const setWorkspaceUser = (user: string) => { workspaceUser = user }
+export const getWorkspaceUser = () => workspaceUser
+
+export type SavedView<T> = { id: string; label: string; filters: T }
+const viewsKey = (scope: string) => `purezza:views:${workspaceUser}:${scope}`
+
+/** Visualizações salvas: só filtros, ordenação e tamanho de página. Nunca resultados. */
+export function readViews<T>(scope: string): SavedView<T>[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(viewsKey(scope)) ?? '[]')
+    return Array.isArray(raw) ? raw.filter(view => view && typeof view.label === 'string' && typeof view.id === 'string').slice(0, 12) : []
+  } catch { return [] }
+}
+export function writeViews<T>(scope: string, views: SavedView<T>[]) {
+  try { localStorage.setItem(viewsKey(scope), JSON.stringify(views.slice(0, 12))) } catch { /* armazenamento indisponível */ }
+}

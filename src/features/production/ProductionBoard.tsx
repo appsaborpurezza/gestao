@@ -151,6 +151,9 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
   const [input, setInput] = useState('')
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'board' | 'list'>('board')
+  // Densidade dos cartões, lembrada neste navegador: compacto mostra só OP, produto, prazo e situação.
+  const [dense, setDense] = useState(() => localStorage.getItem('purezza:board-density') === 'compact')
+  useEffect(() => { try { localStorage.setItem('purezza:board-density', dense ? 'compact' : 'detailed') } catch { /* indisponível */ } }, [dense])
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null)
   const details = useRef<HTMLDialogElement>(null)
   const tv = useRef<HTMLDialogElement>(null)
@@ -220,13 +223,15 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
     <FilterBar activeCount={search ? 1 : 0} onClear={() => { setInput(''); setSearch(''); setOffsets({}) }}
       onRefresh={() => void board.refetch()} refreshing={board.isFetching}>
       <SearchInput label="Buscar por OP, pedido, cliente, produto ou lote" value={input} onChange={setInput}/>
+      {view === 'board' && <button type="button" className="secondary" aria-pressed={dense} onClick={() => setDense(value => !value)}>
+        {dense ? 'Cartões detalhados' : 'Cartões compactos'}</button>}
       <label className={view === 'board' ? 'board-stage-filter' : undefined}>Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
         {columns.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
       </select></label>
     </FilterBar>
     {board.isPending && <Skeleton lines={6} label="Carregando massadas…"/>}
     {board.isError && <ErrorState title="Falha ao consultar o quadro de produção" onRetry={() => void board.refetch()}/>}
-    {board.data && (view === 'board' ? <div className="kanban" aria-busy={board.isPlaceholderData}>
+    {board.data && (view === 'board' ? <div className="kanban" data-density={dense ? 'compact' : undefined} aria-busy={board.isPlaceholderData}>
         {columns.map(([key, title]) => {
           const { total, rows } = board.data[key]
           return <section key={key} className="kanban-column" data-stage={key} data-selected={column === key} aria-labelledby={'stage-' + key}>
