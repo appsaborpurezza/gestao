@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { CommercialDocument as DocumentData } from './commercialPdf'
 
 async function loadLogo() {
-  const response = await fetch(import.meta.env.BASE_URL + 'logo.png')
+  const response = await fetch(import.meta.env.BASE_URL + 'logo-512.png')
   if (!response.ok) throw new Error('Falha ao carregar o logotipo.')
   const blob = await response.blob()
   return new Promise<string>((resolve, reject) => {
