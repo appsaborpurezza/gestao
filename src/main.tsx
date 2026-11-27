@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
@@ -6,7 +6,13 @@ import { AppShell } from './layouts/AppShell'
 import type { RecordMatch } from './layouts/RecordSearch'
 import { Access } from './features/auth/Access'
 import { supabase } from './lib/supabase'
+import { useHashRoute } from './lib/routes'
+import { canNavigate } from './layouts/navigation'
+import { ErrorState, ForbiddenState, Skeleton } from './ui'
+import { ProductCatalog } from './features/products/ProductCatalog'
+import './styles/tokens.css'
 import './styles.css'
+import './styles/shell.css'
 
 const ImportForm = lazy(() => import('./features/import/ImportForm').then(module => ({ default: module.ImportForm })))
 const Inventory = lazy(() => import('./features/inventory/Inventory').then(module => ({ default: module.Inventory })))
@@ -25,12 +31,24 @@ const ProductionBoard = lazy(() => import('./features/production/ProductionBoard
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const OperationalAlerts = lazy(() => import('./features/alerts/OperationalAlerts'))
 const ReportCenter = lazy(() => import('./features/reports/ReportCenter'))
+const ProfileManagement = lazy(() => import('./features/administration/ProfileManagement'))
 
 const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
 
 function Workspace({ userId }: { userId: string }) {
-  const [tab, setTab] = useState('dashboard')
-  const [target, setTarget] = useState<RecordMatch | null>(null)
+  const [route, navigate] = useHashRoute()
+  const tab = route.module
+  const setTab = (module: string) => navigate({ module, recordId: null })
+  const [targetMeta, setTargetMeta] = useState<RecordMatch | null>(null)
+  // O registro aberto vem da URL; o rótulo da busca só complementa a exibição.
+  const target = useMemo<RecordMatch | null>(() => route.recordId
+    ? (targetMeta?.record_id === route.recordId && targetMeta.module === route.module
+      ? targetMeta : { module: route.module as RecordMatch['module'], record_id: route.recordId, label: '', reference: '' })
+    : null, [route, targetMeta])
+  const setTarget = (record: RecordMatch | null) => {
+    setTargetMeta(record)
+    navigate(record ? { module: record.module, recordId: record.record_id } : { module: route.module, recordId: null })
+  }
   const [unitItem, setUnitItem] = useState<string | null>(null)
   const [recipeReview, setRecipeReview] = useState<{ id: string; title: string } | null>(null)
   const profile = useQuery({
@@ -71,48 +89,37 @@ function Workspace({ userId }: { userId: string }) {
   const productForUnits = catalog.data?.find(product => product.id === unitItem)
 
   return <AppShell active={tab} role={role} name={profile.data?.display_name} accountScope={`${userId}:${role}`}
-    onNavigate={id => { setTarget(null); setTab(id) }}
+    onNavigate={id => { setTargetMeta(null); setTab(id) }}
     onOpenRecord={record => {
       setUnitItem(null)
       setRecipeReview(null)
       setTarget(record)
-      setTab(record.module)
     }}
     onSignOut={async () => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
     }}>
-      {profile.isPending && <p role="status">Verificando acesso…</p>}
-      {profile.isError && <div role="alert"><p>Falha ao consultar o perfil.</p><button type="button" onClick={() => void profile.refetch()}>Tentar novamente</button></div>}
-      {profile.isSuccess && !profile.data && <p role="alert">Esta conta precisa de um perfil ativo.</p>}
+      {profile.isPending && <Skeleton lines={4} label="Verificando acesso…"/>}
+      {profile.isError && <ErrorState title="Falha ao consultar o perfil" onRetry={() => void profile.refetch()}/>}
+      {profile.isSuccess && !profile.data && <ForbiddenState description="Esta conta precisa de um perfil ativo. Procure a administração."/>}
+      {role && !canNavigate(tab, role) && <ForbiddenState description="Este endereço não existe ou não está disponível para o seu perfil."/>}
       {profile.data && <>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} /></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
         {tab === 'reports' && role && <Suspense fallback={<p role="status">Abrindo relatórios…</p>}>
-          <ReportCenter role={role} onNavigate={setTab}/>
+          <ReportCenter role={role} accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
-        {tab === 'products' && <section className="panel"><h1>Produtos</h1>
-          {target?.module === 'products' && <button type="button" className="secondary" onClick={() => { setUnitItem(null); setTarget(null) }}>Ver todos os produtos</button>}
-          {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<p role="status">Abrindo configuração…</p>}>
+        {tab === 'profiles' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo usuários…</p>}>
+          <ProfileManagement userId={userId}/>
+        </Suspense>}
+        {tab === 'products' && <section>
+          {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<Skeleton lines={4} label="Abrindo configuração…"/>}>
             <ProductUnits key={productForUnits.id} product={productForUnits} onClose={() => setUnitItem(null)}/>
-          </Suspense> : <>
-          {catalog.isPending && <p role="status">Carregando produtos…</p>}
-          {catalog.isError && <p role="alert">Falha ao carregar produtos.</p>}
-          {catalog.data?.length === 0 && <p>Nenhum produto cadastrado.</p>}
-          {!!catalog.data?.length && <div className="table-scroll"><table><thead><tr>
-            <th>Código</th><th>Produto</th><th>Classificação</th><th>Validação</th><th>Unidade</th>
-            {role === 'ADMINISTRADOR' && <th>Ação</th>}
-          </tr></thead><tbody>{catalog.data.map(item => <tr key={item.id}>
-            <td>{item.original_code}</td><td>{item.commercial_description ?? item.original_description}</td>
-            <td>{item.classification.replaceAll('_', ' ')}</td><td>{item.validation_status.replaceAll('_', ' ')}</td>
-            <td>{item.base_unit ?? 'A validar'}</td>
-            {role === 'ADMINISTRADOR' && <td><button type="button" className="secondary" onClick={() => setUnitItem(item.id)}>
-              Configurar unidade<span className="sr-only"> do item {item.original_code}</span>
-            </button></td>}
-          </tr>)}</tbody></table></div>}
-          </>}
+          </Suspense> : <ProductCatalog items={catalog.data} loading={catalog.isFetching} error={catalog.isError}
+            onRetry={() => void catalog.refetch()} canConfigure={role === 'ADMINISTRADOR'} onConfigure={setUnitItem}
+            focused={target?.module === 'products'} onShowAll={() => { setUnitItem(null); setTarget(null) }}/>}
         </section>}
         {tab === 'recipes' && role !== 'VENDAS' && <section className="panel"><h1>Receitas</h1>
           {target?.module === 'recipes' && <button type="button" className="secondary" onClick={() => { setRecipeReview(null); setTarget(null) }}>Ver todas as receitas</button>}
@@ -147,13 +154,16 @@ function Workspace({ userId }: { userId: string }) {
           <OperationalCatalogs/>
         </Suspense>}
         {tab === 'inventory' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo estoque…</p>}>
-          <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}/>
+          <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}
+            initialLot={target?.record_id} onOpen={id => navigate({ module: 'inventory', recordId: id })}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
-          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}/>
+          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}
+            onOpen={id => navigate({ module: 'customers', recordId: id })}/>
         </Suspense>}
         {tab === 'orders' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo pedidos…</p>}>
-          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}/>
+          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}
+            onOpen={id => navigate({ module: 'orders', recordId: id })}/>
         </Suspense>}
         {tab === 'production-demand' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo demandas…</p>}>
           <ProductionDemand/>
@@ -165,7 +175,8 @@ function Workspace({ userId }: { userId: string }) {
           <ProductionBoard canStart={role !== 'VENDAS'}/>
         </Suspense>}
         {tab === 'traceability' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo rastreabilidade…</p>}>
-          <Traceability/>
+          <Traceability key={target?.module === 'traceability' ? target.record_id : 'traceability'}
+            initialCode={target?.module === 'traceability' ? target.reference : undefined}/>
         </Suspense>}
         {tab === 'recall' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo recolhimentos…</p>}>
           <Recall canOpen={role === 'ADMINISTRADOR'} canResolve={role === 'ADMINISTRADOR' && profile.data.can_release_lot}/>

@@ -22,7 +22,7 @@ beforeAll(async () => {
     create role anon;
     create role authenticated;
     create schema auth;
-    create table auth.users (id uuid primary key);
+    create table auth.users (id uuid primary key, email text, email_confirmed_at timestamptz, is_anonymous boolean not null default false);
     create function auth.uid() returns uuid language sql stable
       as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     grant usage on schema auth to authenticated;
@@ -72,13 +72,15 @@ beforeAll(async () => {
     '20261127000300_production_board_revision.sql',
     '20261127000400_workspace_search.sql',
     '20261127000500_operational_alerts.sql',
+    '20261127000600_manage_profiles.sql',
+    '20261127000700_workspace_lot_search.sql',
   ]) {
     await db.exec(await migration(name))
   }
   for (const [id, role, active] of [
     [admin, 'ADMINISTRADOR', true], [sales, 'VENDAS', true], [production, 'PRODUCAO', true], [inactive, 'ADMINISTRADOR', false],
   ]) {
-    await db.query('insert into auth.users values ($1)', [id])
+    await db.query('insert into auth.users(id) values ($1)', [id])
     await db.query('insert into public.profiles(id, display_name, role, active) values ($1, $2, $3, $4)', [id, role, role, active])
   }
 }, 30_000)
@@ -128,6 +130,37 @@ test('alertas operacionais respeitam o perfil e omitem grupos sem ocorrências',
   expect((await alerts()).rows).toEqual([])
   await asUser(inactive)
   await expect(alerts()).rejects.toThrow('perfil')
+})
+
+test('administração audita a edição de perfis e bloqueia alterações não autorizadas', async () => {
+  const edit = (target: string, version: number, role = 'VENDAS', active = true) => db.query(
+    'select public.manage_profile($1,$2,$3,$4,$5,true,false) version', [target, version, 'Nome revisado', role, active],
+  )
+  await db.exec('begin')
+  try {
+    await asUser(admin)
+    expect((await edit(sales,1)).rows).toEqual([{ version: 2 }])
+    expect((await db.query('select action from public.audit_logs where action=$1',['GERENCIAR_PERFIL'])).rows).toHaveLength(1)
+  } finally { await db.exec('rollback') }
+  await asUser(sales)
+  await expect(edit(sales,1)).rejects.toThrow('Somente Administração')
+  await asUser(admin)
+  await expect(edit(admin,1,'ADMINISTRADOR',false)).rejects.toThrow('outro administrador')
+  await expect(edit(sales,20)).rejects.toThrow('perfil mudou')
+})
+
+test('vincula uma conta confirmada sem conceder permissões técnicas', async () => {
+  const target = crypto.randomUUID()
+  await db.exec('reset role; begin')
+  try {
+    await db.query('insert into auth.users(id,email,email_confirmed_at) values ($1,$2,now())',[target,'conta@example.invalid'])
+    await asUser(admin)
+    const link = () => db.query("select public.link_auth_profile('CONTA@example.invalid','Conta teste','PRODUCAO') id")
+    expect((await link()).rows).toEqual([{ id: target }])
+    expect((await db.query('select can_release_lot,can_approve_recipe from public.profiles where id=$1',[target])).rows)
+      .toEqual([{ can_release_lot: false, can_approve_recipe: false }])
+    await expect(link()).rejects.toThrow('já possui perfil')
+  } finally { await db.exec('rollback') }
 })
 
 test('rejeita duplicidades e desfaz toda a carga se um ingrediente for inválido', async () => {
@@ -1537,6 +1570,12 @@ test('ficha técnica vincula insumos sem substituir a transcrição ou aprovar a
   )).rows
   const finishedCode = codes.find(row=>row.id===finishedLot)!.internal_code
   const ingredientCode = codes.find(row=>row.id===earlyLot)!.internal_code
+  const findLot = (code: string) => db.query("select record_id,reference from public.workspace_search($1) where module='traceability'",[code.toLowerCase()])
+  await asUser(production)
+  expect((await findLot(finishedCode)).rows).toEqual([{record_id:finishedLot,reference:finishedCode}])
+  expect((await findLot(ingredientCode)).rows).toEqual([{record_id:earlyLot,reference:ingredientCode}])
+  await asUser(sales)
+  expect((await findLot(finishedCode)).rows).toEqual([])
   const genealogy = async (code: string) => (await db.query<{
     trace: { production: { batches: unknown[]; inputs: unknown[]; uses: unknown[]; water: unknown[]; destinations: unknown[] } }
   }>('select public.trace_inventory_lot($1) trace',[code])).rows[0]!.trace.production
