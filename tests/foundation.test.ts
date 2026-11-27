@@ -67,6 +67,7 @@ beforeAll(async () => {
     '20261124003900_mass_losses.sql',
     '20261124004000_stock_waste.sql',
     '20261124004100_role_dashboard.sql',
+    '20261127000100_production_board_columns.sql',
   ]) {
     await db.exec(await migration(name))
   }
@@ -1397,6 +1398,21 @@ test('ficha técnica vincula insumos sem substituir a transcrição ou aprovar a
     expect.objectContaining({id:batchIds[0]!.id,status:'EM_EMBALAGEM',operator:null,stage_started_at:expect.any(String)}),
   ]))
   expect(board!.report.rows.every(row => !('recipe_snapshot' in row))).toBe(true)
+  const columns = async (offsets = {}, search = '') => (await db.query<{
+    report: Record<string, { total: number; rows: Record<string, unknown>[] }>
+  }>('select public.production_board_columns(1,$1,$2) report', [JSON.stringify(offsets), search])).rows[0]!.report
+  const firstColumns = await columns()
+  expect(Object.keys(firstColumns)).toHaveLength(6)
+  expect(firstColumns.EM_EMBALAGEM!.rows).toEqual([
+    expect.objectContaining({id:batchIds[0]!.id,status:'EM_EMBALAGEM',operator:null}),
+  ])
+  const nextPackingPage = await columns({EM_EMBALAGEM: 1})
+  expect(nextPackingPage.EM_EMBALAGEM).toMatchObject({total:1,rows:[]})
+  expect(nextPackingPage.PLANEJADA).toEqual(firstColumns.PLANEJADA)
+  expect((await columns({}, 'termo sem correspondência')).EM_EMBALAGEM).toEqual({total:0,rows:[]})
+  await expect(columns({EM_EMBALAGEM: -1})).rejects.toThrow('paginação')
+  await asUser(inactive)
+  await expect(columns()).rejects.toThrow('perfil')
   await db.exec('reset role')
   const packingItems = (await db.query<{ id: string; original_code: string }>(`
     insert into public.items(original_code,original_description,classification,base_unit) values

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
+import { AppShell } from './layouts/AppShell'
 import { Access } from './features/auth/Access'
 import { supabase } from './lib/supabase'
 import './styles.css'
@@ -61,31 +62,15 @@ function Workspace({ userId }: { userId: string }) {
   const role = profile.data?.role
   const productForUnits = catalog.data?.find(product => product.id === unitItem)
 
-  return <>
-    <header><strong>Sabor Purezza SMART</strong><button className="secondary" onClick={() => void supabase.auth.signOut()}>Sair</button></header>
-    <main className="workspace">
+  return <AppShell active={tab} role={role} name={profile.data?.display_name} onNavigate={setTab}
+    onSignOut={async () => {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    }}>
       {profile.isPending && <p role="status">Verificando acesso…</p>}
-      {profile.isError && <p role="alert">Falha ao consultar o perfil.</p>}
+      {profile.isError && <div role="alert"><p>Falha ao consultar o perfil.</p><button type="button" onClick={() => void profile.refetch()}>Tentar novamente</button></div>}
       {profile.isSuccess && !profile.data && <p role="alert">Esta conta precisa de um perfil ativo.</p>}
       {profile.data && <>
-        <p className="identity">{profile.data.display_name} · {role}</p>
-        <nav aria-label="Gestão">
-          <button aria-pressed={tab === 'dashboard'} onClick={() => setTab('dashboard')}>Indicadores</button>
-          <button aria-pressed={tab === 'products'} onClick={() => setTab('products')}>Produtos</button>
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'recipes'} onClick={() => setTab('recipes')}>Receitas</button>}
-          {role === 'ADMINISTRADOR' && <button aria-pressed={tab === 'recipe-assignments'} onClick={() => setTab('recipe-assignments')}>Associações de receitas</button>}
-          {role === 'ADMINISTRADOR' && <button aria-pressed={tab === 'import'} onClick={() => setTab('import')}>Importação</button>}
-          {role === 'ADMINISTRADOR' && <button aria-pressed={tab === 'operational-catalog'} onClick={() => setTab('operational-catalog')}>Cadastros operacionais</button>}
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'inventory'} onClick={() => setTab('inventory')}>Estoque</button>}
-          {role !== 'PRODUCAO' && <button aria-pressed={tab === 'customers'} onClick={() => setTab('customers')}>Clientes</button>}
-          {role !== 'PRODUCAO' && <button aria-pressed={tab === 'orders'} onClick={() => setTab('orders')}>Pedidos</button>}
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'production-demand'} onClick={() => setTab('production-demand')}>Demanda de produção</button>}
-          <button aria-pressed={tab === 'production-board'} onClick={() => setTab('production-board')}>Quadro de produção</button>
-          <button aria-pressed={tab === 'shipping'} onClick={() => setTab('shipping')}>Expedição</button>
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'traceability'} onClick={() => setTab('traceability')}>Rastreabilidade</button>}
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'recall'} onClick={() => setTab('recall')}>Recolhimentos</button>}
-          {role !== 'VENDAS' && <button aria-pressed={tab === 'losses'} onClick={() => setTab('losses')}>Desperdícios</button>}
-        </nav>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} /></Suspense>}
         {tab === 'products' && <section className="panel"><h1>Produtos</h1>
           {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<p role="status">Abrindo configuração…</p>}>
@@ -166,8 +151,7 @@ function Workspace({ userId }: { userId: string }) {
           <Losses admin={role === 'ADMINISTRADOR'} canAuthorize={profile.data.can_release_lot}/>
         </Suspense>}
       </>}
-    </main>
-  </>
+  </AppShell>
 }
 
 function App() {

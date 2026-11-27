@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { PreparationChecklist } from './PreparationChecklist'
 import { StageResult } from './StageResult'
@@ -15,7 +15,8 @@ const columns = [
   ['EM_EMBALAGEM', 'Embalagem'],
   ['FINALIZADA', 'Finalizado'],
 ] as const
-const pageSize = 30
+const pageSize = 8
+type Stage = typeof columns[number][0]
 const lossOperations: Record<string, Exclude<LossOperation, 'OUTRA'>> = {
   EM_PREPARACAO: 'PREPARACAO', EM_BATER_MASSA: 'BATER_MASSA', EM_CILINDROS: 'CILINDROS', EM_EMBALAGEM: 'EMBALAGEM',
 }
@@ -107,41 +108,69 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
 }
 
 export function ProductionBoard({ canStart }: { canStart: boolean }) {
-  const [page, setPage] = useState(0)
-  const [column, setColumn] = useState<string>('PLANEJADA')
+  const [offsets, setOffsets] = useState<Partial<Record<Stage, number>>>({})
+  const [column, setColumn] = useState<Stage>('PLANEJADA')
+  const [input, setInput] = useState('')
+  const [search, setSearch] = useState('')
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (input.trim() !== search) {
+        setSearch(input.trim())
+        setOffsets({})
+      }
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [input, search])
   const board = useQuery({
-    queryKey: ['production-board', page],
-    refetchInterval: 15_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('production_board', { page_size: pageSize, page_offset: page * pageSize })
+    queryKey: ['production-board', 'columns', search, offsets],
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.rpc('production_board_columns', {
+        page_size: pageSize, page_offsets: offsets, search,
+      }).abortSignal(signal)
       if (error) throw error
-      return data as { total: number; rows: Batch[] }
+      return data as Record<Stage, { total: number; rows: Batch[] }>
     },
   })
 
   return <section className="panel">
     <h1>Quadro de produção</h1>
+    <div className="customer-fields">
+      <label>Buscar massadas
+        <input type="search" maxLength={100} value={input} onChange={event => setInput(event.target.value)}
+          placeholder="OP, pedido, cliente, produto ou lote"/>
+      </label>
+      <div className="customer-actions">
+        <button type="button" className="secondary" disabled={!input && !Object.keys(offsets).length}
+          onClick={() => { setInput(''); setSearch(''); setOffsets({}) }}>Limpar filtros</button>
+        <button type="button" className="secondary" disabled={board.isFetching}
+          onClick={() => void board.refetch()}>Atualizar quadro</button>
+      </div>
+    </div>
     {board.isPending && <p role="status">Carregando massadas…</p>}
-    {board.isError && <p role="alert">Falha ao consultar o quadro de produção.</p>}
+    {board.isError && <p role="alert">Falha ao consultar o quadro de produção. Use Atualizar quadro para tentar novamente.</p>}
     {board.data && <>
-      <label className="board-stage-filter">Etapa <select value={column} onChange={event => setColumn(event.target.value)}>
+      <label className="board-stage-filter">Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
         {columns.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
       </select></label>
-      <div className="production-board">
+      <div className="production-board" aria-busy={board.isPlaceholderData}>
         {columns.map(([key, title]) => {
-          const cards = board.data.rows.filter(batch => batch.status === key)
+          const { total, rows } = board.data[key]
+          const offset = offsets[key] ?? 0
           return <section key={key} className="board-stage" data-selected={column === key}>
-            <h2>{title}</h2>
-            {cards.length === 0 && <p>Nenhuma massada nesta página.</p>}
-            {cards.map(batch => <BatchCard key={batch.id} batch={batch} canStart={canStart}/>)}
+            <h2>{title} <span className="board-count">{total}</span></h2>
+            {rows.length === 0 && <p>{total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
+            {rows.map(batch => <BatchCard key={batch.id} batch={batch} canStart={canStart}/>)}
+            {(total > pageSize || offset > 0) && <nav aria-label={`Páginas de ${title}`}>
+              <button type="button" className="secondary" disabled={board.isPlaceholderData || offset === 0}
+                onClick={() => setOffsets(previous => ({ ...previous, [key]: Math.max(0, offset - pageSize) }))}>Anterior</button>
+              <button type="button" className="secondary" disabled={board.isPlaceholderData || offset + pageSize >= total}
+                onClick={() => setOffsets(previous => ({ ...previous, [key]: offset + pageSize }))}>Próxima</button>
+            </nav>}
           </section>
         })}
       </div>
-      {(board.data.total > pageSize || page > 0) && <nav aria-label="Páginas do quadro">
-        <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-        <span>Página {page + 1} · {board.data.total} massadas</span>
-        <button type="button" disabled={(page + 1) * pageSize >= board.data.total} onClick={() => setPage(page + 1)}>Próxima</button>
-      </nav>}
     </>}
   </section>
 }

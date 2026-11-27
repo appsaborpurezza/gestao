@@ -197,3 +197,10 @@ Em **Recolhimentos**, a Administração pode abrir um caso com o código interno
 A Administração com permissão sanitária específica pode encerrar o recolhimento após registrar a avaliação. O encerramento conserva o bloqueio dos lotes. Uma liberação posterior exige decisão sanitária em **Estoque** e ausência de outros casos ativos sobre o lote. A retomada de uma massada exige o encerramento de todos os casos ativos que a afetam e autorização registrada em cada caso. Os registros de abertura, avaliação, bloqueio e retomada ficam no histórico.
 
 Unidades comerciais alternativas, avaliação sanitária de devoluções para eventual reaproveitamento, exportação da rastreabilidade, tratamento de pedidos confirmados, múltiplas apresentações por massada e cancelamento fiscal continuam pendentes.
+## Modernização V2
+
+A branch `feat/v2-modernizacao` parte da referência local `474767a`. O primeiro incremento reorganiza os módulos em uma barra lateral recolhível, com menu em diálogo para telas menores. Use **Buscar módulos** ou **Ctrl+K** para localizar uma tela autorizada. A busca deste incremento abrange nomes de módulos.
+
+O Supabase de produção foi conferido antes da alteração de interface. Foram constatadas 41 migrations, 54 tabelas públicas com RLS, 37 produtos e nove versões de receita. O ambiente Supabase de homologação já existente é `vooyoomskkaivlluioeq`.
+
+O Kanban V2 usa a migration incremental `20261127000100_production_board_columns.sql`. A consulta retorna as seis etapas com totais filtrados e paginação própria. A busca abrange número da OP, pedido, cliente, produto e lote, ignora acentos e cancela requisições obsoletas. A atualização periódica do quadro passa para 60 segundos. Valide a migration em homologação e confirme o backup antes da publicação que usa a nova RPC.
