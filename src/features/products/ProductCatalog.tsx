@@ -7,6 +7,7 @@ import { toast } from '../../ui/toast'
 import { BulkActions, useRowSelection } from '../../ui/BulkActions'
 import { DataTable, type Column } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
+import { SavedViews } from '../../ui/SavedViews'
 import { Badge, PageHeader } from '../../ui'
 import { highlightParts, matchesTerm } from '../../lib/text'
 
@@ -163,6 +164,11 @@ export function ProductCatalog({ items, loading, error, onRetry, canConfigure, o
         <option value="">Ativos e inativos</option><option value="active">Somente ativos</option><option value="inactive">Somente inativos</option>
       </select>
     </FilterBar>
+    <SavedViews<typeof filters> scope="products" current={filters} onApply={setFilters} presets={[
+      { id: 'todos', label: 'Todos', filters: { term: '', classification: '', unit: '', status: '' } },
+      { id: 'unidade', label: 'Unidade a validar', filters: { term: '', classification: '', unit: 'none', status: 'active' } },
+      { id: 'proprios', label: 'Fabricação própria', filters: { term: '', classification: 'FABRICACAO_PROPRIA', unit: '', status: 'active' } },
+    ]}/>
     <BulkActions entity={bulkEntity} canChange={canConfigure && !mixed} filename="produtos.csv" onClear={selection.clear}
       onDone={() => void refresh()}
       rows={selection.rows.map(row => ({ id: row.id, label: row.original_code + ' · ' + (row.commercial_description ?? row.original_description),

@@ -9,7 +9,9 @@ import { FilterBar } from '../../ui/filters'
 import { Tabs } from '../../ui/Tabs'
 import { useLossMutation, useLossOptions } from './lossSupport'
 import { StockWasteHistory } from '../inventory/StockWaste'
-import { CatalogLifecycleDialog, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
+import { CatalogLifecycleDialog, Modal, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
+import { useIdempotentRpc } from '../../lib/catalog'
+import { toast } from '../../ui/toast'
 
 const operations = {
   PREPARACAO: 'Preparação', BATER_MASSA: 'Bater massa', CILINDROS: 'Cilindros', EMBALAGEM: 'Embalagem', OUTRA: 'Outra operação',
@@ -108,7 +110,7 @@ function ConfigureLosses({ canAuthorize, onClose }: { canAuthorize: boolean; onC
   </article>
 }
 
-type LossOption = { id: string; name: string; active: boolean }
+type LossOption = { id: string; name: string; active: boolean; version: number; authorization_reference?: string }
 
 /** Lista de motivos ou destinações com inativação, reativação, exclusão segura e histórico. */
 function LossOptionList({ kind, canAuthorize }: { kind: 'MOTIVO' | 'DESTINACAO'; canAuthorize: boolean }) {
@@ -118,11 +120,13 @@ function LossOptionList({ kind, canAuthorize }: { kind: 'MOTIVO' | 'DESTINACAO';
   const list = useQuery({
     queryKey: ['losses', 'option-list', table],
     queryFn: async (): Promise<LossOption[]> => {
-      const { data, error } = await supabase.from(table).select('id,name,active').order('active', { ascending: false }).order('name')
+      const { data, error } = await supabase.from(table).select(kind === 'MOTIVO' ? 'id,name,active,version' : 'id,name,active,version,authorization_reference')
+        .order('active', { ascending: false }).order('name').returns<LossOption[]>()
       if (error) throw error
       return data
     },
   })
+  const [editing, setEditing] = useState<LossOption | null>(null)
   // Destinações exigem a autorização de liberação de lotes também para inativar ou excluir.
   const manage = kind === 'MOTIVO' || canAuthorize
   const columns: Column<LossOption>[] = [
@@ -133,11 +137,50 @@ function LossOptionList({ kind, canAuthorize }: { kind: 'MOTIVO' | 'DESTINACAO';
     <DataTable caption={kind === 'MOTIVO' ? 'Motivos cadastrados' : 'Destinações cadastradas'} rows={list.data} columns={columns}
       rowKey={row => row.id} loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
       empty={{ title: 'Nenhum cadastro', description: 'Inclua o primeiro registro no formulário acima.' }}
-      rowActions={manage ? row => <RecordActions label={row.name} actions={lifecycleActions(row.active, mode => lifecycle.open(row.id, mode))}/> : undefined}/>
+      rowActions={manage ? row => <RecordActions label={row.name} onEdit={() => setEditing(row)}
+        actions={lifecycleActions(row.active, mode => lifecycle.open(row.id, mode))}/> : undefined}/>
+    {manage && <EditLossOption kind={kind} option={editing} onClose={() => setEditing(null)}
+      onSaved={() => { setEditing(null); void cache.invalidateQueries({ queryKey: ['losses'] }) }}/>}
     {manage && <CatalogLifecycleDialog entity={kind === 'MOTIVO' ? 'MOTIVO_PERDA' : 'DESTINACAO_PERDA'}
       recordId={lifecycle.recordId} mode={lifecycle.mode} onClose={lifecycle.close} onModeChange={lifecycle.setMode}
       onDone={() => { lifecycle.close(); void cache.invalidateQueries({ queryKey: ['losses'] }) }}/>}
   </>
+}
+
+/** Edição de nome (e referência sanitária da destinação). Os registros de perda apontam para o id: o histórico continua ligado. */
+function EditLossOption({ kind, option, onClose, onSaved }: {
+  kind: 'MOTIVO' | 'DESTINACAO'; option: LossOption | null; onClose: () => void; onSaved: () => void
+}) {
+  const { run, busy } = useIdempotentRpc()
+  const [error, setError] = useState('')
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!option) return
+    const fields = new FormData(event.currentTarget)
+    setError('')
+    try {
+      await run('update_loss_option', {
+        kind: kind === 'MOTIVO' ? 'MOTIVO_PERDA' : 'DESTINACAO_PERDA', target: option.id, expected_version: option.version,
+        input: kind === 'MOTIVO' ? { name: fields.get('name') } : { name: fields.get('name'), authorization_reference: fields.get('reference') },
+      }, 'Não foi possível salvar a alteração.')
+      toast('Cadastro atualizado.')
+      onSaved()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a alteração.') }
+  }
+  return <Modal open={option !== null} title={kind === 'MOTIVO' ? 'Editar motivo de perda' : 'Editar destinação'} onClose={() => { setError(''); onClose() }}>
+    {option && <form className="ui-form" onSubmit={save}>
+      <label>Nome <input name="name" defaultValue={option.name} maxLength={kind === 'MOTIVO' ? 100 : 120} required/></label>
+      {kind === 'DESTINACAO' && <label>Referência da autorização sanitária
+        <input name="reference" defaultValue={option.authorization_reference} maxLength={500} required/></label>}
+      <p className="ui-muted">As perdas já registradas continuam ligadas a este cadastro. O nome anterior fica guardado no histórico.</p>
+      {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
+      <div className="ui-modal-actions">
+        <button type="button" className="secondary" onClick={onClose} disabled={busy}>Cancelar</button>
+        <button disabled={busy}>{busy ? 'Salvando…' : 'Salvar alteração'}</button>
+      </div>
+    </form>}
+  </Modal>
 }
 
 function ReconcileLoss({ id }: { id: string }) {

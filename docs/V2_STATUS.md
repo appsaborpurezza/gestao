@@ -52,6 +52,19 @@ V1 001–041 refere-se à série `2026112400xxx`. V2 001–008 refere-se à sér
 - A rastreabilidade individual não muda: cada cartão continua sendo uma massada, com o mesmo painel lateral e os mesmos registros.
 - Arrastar e soltar: não se aplica. Cada mudança de etapa exige registros obrigatórios (checklist, medições, embalagem, lote), que só o formulário da etapa coleta. Arrastar um cartão daria a impressão de que a etapa foi concluída sem esses registros. A ação continua pelo botão da etapa no painel lateral e no terminal.
 
+## Pendências de CRUD e UX (Etapa 4, migration 01400)
+
+| Item | Antes | Agora |
+| --- | --- | --- |
+| Descontinuar receita | Não existia | `set_recipe_discontinued` (Administração com aprovação técnica, justificativa, auditoria). Exige encerrar antes as associações vigentes; OPs já planejadas seguem. Gatilhos no banco recusam nova associação ou nova OP com receita descontinuada. Reativação com justificativa |
+| Editar motivos e destinações de perda | Só incluir, inativar e excluir | `update_loss_option` com versão (40001), nome único (23505) e auditoria com antes e depois. Destinação exige a autorização sanitária |
+| Conversões de unidade | Só nova versão | Lista de versões; exclusão só de versão substituída e nunca usada em pedidos (`delete_unit_conversion`). A vigente nunca é excluída |
+| Linha do tempo | Histórico por registro | Módulo "Linha do tempo" (Administração): auditoria por dia, filtros por ação, usuário e período, visualizações salvas e carregamento incremental. Nunca mostra JSON cru |
+| Busca global | Produtos, clientes, pedidos, receitas, lotes, fornecedores | Mais OPs (abre o Kanban filtrado pela OP), massadas (pelo código) e expedições (abre o histórico na expedição). Vendas não vê OPs |
+| Visualizações salvas | Pedidos, Clientes, Kanban | Também Produtos, Receitas, Painéis e Linha do tempo |
+| Autocomplete universal | `Combobox` em pedidos, estoque, posição e receitas | Sem mudança nesta etapa: os campos de escolha longa já usam `Combobox`; filtros curtos continuam como seleção |
+| Personalização do painel | Não existia | Visão geral: "Personalizar" escolhe os indicadores exibidos, salvo por usuário neste navegador |
+
 ## Implantação e recuperação
 
 1. Antes de qualquer migration em produção, gere o backup lógico (todas as tabelas de `public` e `purezza_private` como `jsonb`) e confira o MD5 com o calculado no servidor. O backup de 27/11/2026 está na pasta de arquivos do projeto (`backups/producao-20261127T0609Z`).

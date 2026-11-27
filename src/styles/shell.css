@@ -881,3 +881,12 @@ nav .shell-department[aria-expanded=false] svg { transform: rotate(-90deg); }
 .terminal-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 .tv-kpis small, .tv-stage-kg { font-size: clamp(.9rem, 1.2vw, 1.3rem); color: #cfe0ef; font-variant-numeric: tabular-nums; }
 @media (max-width: 520px) { .board-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+/* Linha do tempo de atividades */
+.activity-day h2 { font-size: 1rem; margin: var(--space-5, 20px) 0 var(--space-2, 8px); }
+.activity-list { list-style: none; margin: 0; padding: 0; border-inline-start: 2px solid var(--color-border); }
+.activity-list li { display: grid; grid-template-columns: 4.5rem 1fr; gap: var(--space-3, 12px); padding: var(--space-2, 8px) var(--space-3, 12px); position: relative; }
+.activity-list li::before { content: ''; position: absolute; inset-inline-start: -6px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); }
+.activity-list time { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.activity-list p { margin: 2px 0 0; color: var(--color-text-secondary, inherit); overflow-wrap: anywhere; }
+.overview-cards { display: grid; gap: var(--space-2, 8px); border: 0; padding: 0; margin: 0; }

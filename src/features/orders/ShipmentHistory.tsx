@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
@@ -120,13 +120,13 @@ function ReturnForm({ shipment, locations, locationsUnavailable, onReturned }: {
   </details>
 }
 
-export function ShipmentHistory({ allowConfirmation }: { allowConfirmation: boolean }) {
+export function ShipmentHistory({ allowConfirmation, focus }: { allowConfirmation: boolean; focus?: string }) {
   const cache = useQueryClient()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(25)
   const [pendingOnly, setPendingOnly] = useState(false)
   const [notice, setNotice] = useState('')
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(focus ?? null)
   const history = useQuery({
     queryKey: ['shipping', 'history', pendingOnly, page, pageSize],
     placeholderData: previous => previous,
@@ -163,6 +163,10 @@ export function ShipmentHistory({ allowConfirmation }: { allowConfirmation: bool
   ]
   const stale = history.isPlaceholderData
   const shipment = history.data?.rows.find(row => row.id === selected)
+  // Vindo da busca global: avança as páginas até achar a expedição (no máximo 20 páginas).
+  const seeking = !!focus && selected === focus && !shipment && !!history.data && !stale
+    && (page + 1) * pageSize < history.data.total && page < 20
+  useEffect(() => { if (seeking) setPage(current => current + 1) }, [seeking])
 
   return <section aria-labelledby="shipment-history-title">
     <h2 id="shipment-history-title" className="sr-only">Histórico de expedições</h2>

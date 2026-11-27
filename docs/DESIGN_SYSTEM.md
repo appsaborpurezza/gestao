@@ -72,3 +72,9 @@ const lifecycle = useLifecycle()
 - Peso sempre em kg com `formatKg` (pt-BR, uma casa decimal).
 - Terminal: fila de 30 em 30 com "Carregar mais"; nunca carrega a fila inteira.
 - Modo TV: só totais operacionais, nunca valores comerciais.
+
+## Linha do tempo e personalização
+
+- Linha do tempo: agrupada por dia, hora à esquerda, ação em destaque e resumo legível dos detalhes (entidade, nome, antes → depois, justificativa). Nunca exibe JSON.
+- Personalizar (Visão geral): diálogo com caixas de seleção; a escolha é local ao navegador e ao usuário e não altera permissões.
+- Descontinuar: diálogo mostra o impacto (associações vigentes, OPs em aberto) e só habilita o botão quando não há associação vigente e a justificativa foi preenchida.
