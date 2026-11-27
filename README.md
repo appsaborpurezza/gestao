@@ -199,6 +199,8 @@ A Administração com permissão sanitária específica pode encerrar o recolhim
 Unidades comerciais alternativas, avaliação sanitária de devoluções para eventual reaproveitamento, exportação da rastreabilidade, tratamento de pedidos confirmados, múltiplas apresentações por massada e cancelamento fiscal continuam pendentes.
 ## Modernização V2
 
+A [matriz de conclusão da V2](docs/V2_STATUS.md) acompanha os 31 tópicos originais, suas evidências e as pendências de homologação e publicação.
+
 A branch `feat/v2-modernizacao` parte da referência local `474767a`. O primeiro incremento reorganiza os módulos em uma barra lateral recolhível, com menu em diálogo para telas menores. Use **Buscar módulos** ou **Ctrl+K** para localizar uma tela autorizada. A busca deste incremento abrange nomes de módulos.
 
 O Supabase de produção foi conferido antes da alteração de interface. Foram constatadas 41 migrations, 54 tabelas públicas com RLS, 37 produtos e nove versões de receita. O ambiente Supabase de homologação já existente é `vooyoomskkaivlluioeq`.

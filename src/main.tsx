@@ -92,7 +92,7 @@ function Workspace({ userId }: { userId: string }) {
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
         {tab === 'reports' && role && <Suspense fallback={<p role="status">Abrindo relatórios…</p>}>
-          <ReportCenter role={role} onNavigate={setTab}/>
+          <ReportCenter role={role} accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
         {tab === 'profiles' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo usuários…</p>}>
           <ProfileManagement userId={userId}/>
