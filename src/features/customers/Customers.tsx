@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Pencil, Plus, Save, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { normalizeText } from '../../lib/text'
 import { DataTable, type Column, type SortState } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
@@ -11,7 +12,8 @@ export function customerSearchFilter(term: string) {
   const cleaned = term.replace(/[,()*]/g, ' ').replace(/[\\%_]/g, token => '\\' + token).trim().replace(/\s+/g, ' ')
   if (!cleaned) return null
   const digits = cleaned.replace(/\D/g, '')
-  const parts = ['legal_name', 'trade_name', 'city', 'contact_name'].map(field => `${field}.ilike.%${cleaned}%`)
+  // search_text é gerado no banco sem acento e em minúsculas (migração 20261127000800).
+  const parts = [`search_text.ilike.%${normalizeText(cleaned)}%`]
   if (digits.length >= 3) parts.push(`document.ilike.%${digits}%`)
   if (/^\d+$/.test(cleaned)) parts.push(`customer_number.eq.${cleaned}`)
   return parts.join(',')

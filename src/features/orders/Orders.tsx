@@ -6,6 +6,7 @@ import { FilterBar, PeriodFilter, SearchInput, useDebouncedValue, useSessionStat
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
 import { todayInSaoPaulo } from '../../lib/periods'
 import { supabase } from '../../lib/supabase'
+import { normalizeText } from '../../lib/text'
 import { formatBrl as currency, formatStockQuantity } from '../../lib/decimal'
 import { OrderBilling } from './OrderBilling'
 import { CommercialDocumentButton, CommercialDocumentSettings } from './CommercialDocument'
@@ -240,7 +241,8 @@ export function Orders({ canRegisterBilling, initialOrder, onOpen }: { canRegist
         .order(column, { ascending: filters.sort?.direction === 'asc', nullsFirst: false }).order('order_number', { ascending: false })
         .range(filters.page * filters.pageSize, (filters.page + 1) * filters.pageSize - 1).abortSignal(signal)
       const cleaned = term.replace(/[,()*\\%_]/g, ' ').trim()
-      if (cleaned) request.or(/^\d+$/.test(cleaned) ? `order_number.eq.${cleaned},customer_name.ilike.%${cleaned}%` : `customer_name.ilike.%${cleaned}%`)
+      const normalized = normalizeText(cleaned)
+      if (cleaned) request.or(/^\d+$/.test(cleaned) ? `order_number.eq.${cleaned},search_text.ilike.%${normalized}%` : `search_text.ilike.%${normalized}%`)
       if (filters.status === 'LATE') request.in('fulfillment_status', ['CONFIRMADO', 'PARCIAL']).lt('delivery_date', today)
       else if (filters.status) request.eq('fulfillment_status', filters.status)
       if (filters.period.from) request.gte('delivery_date', filters.period.from)

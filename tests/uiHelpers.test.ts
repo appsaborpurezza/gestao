@@ -24,7 +24,8 @@ test('presets de período incluindo últimos 7 e 30 dias', () => {
 import { customerSearchFilter } from '../src/features/customers/Customers'
 test('filtro de clientes neutraliza caracteres da sintaxe do PostgREST', () => {
   expect(customerSearchFilter('  ')).toBeNull()
-  expect(customerSearchFilter('Bella, (x)')).toBe('legal_name.ilike.%Bella x%,trade_name.ilike.%Bella x%,city.ilike.%Bella x%,contact_name.ilike.%Bella x%')
+  expect(customerSearchFilter('Bella, (x)')).toBe('search_text.ilike.%bella x%')
+  expect(customerSearchFilter('São JOÃO')).toBe('search_text.ilike.%sao joao%')
   expect(customerSearchFilter('12.345')).toContain('document.ilike.%12345%')
   expect(customerSearchFilter('42')).toContain('customer_number.eq.42')
   expect(customerSearchFilter('50%_')).toContain('%50\\%\\_%')
