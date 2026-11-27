@@ -69,6 +69,7 @@ export const quickActions: QuickAction[] = [
   { id: 'traceability', module: 'traceability', title: 'Consultar lote', hint: 'Rastreabilidade por código', roles: ['ADMINISTRADOR', 'PRODUCAO'] },
   { id: 'losses:registrar', module: 'losses', action: 'registrar', title: 'Registrar desperdício', hint: 'Perda sem massada', roles: ['ADMINISTRADOR', 'PRODUCAO'] },
   { id: 'products:novo', module: 'products', action: 'novo', title: 'Novo produto', hint: 'Cadastrar produto', roles: ['ADMINISTRADOR'] },
+  { id: 'recipes:novo', module: 'recipes', action: 'novo', title: 'Nova receita', hint: 'Criar ficha técnica', roles: ['ADMINISTRADOR'] },
   { id: 'operational-catalog:novo', module: 'operational-catalog', action: 'novo', title: 'Novo fornecedor', hint: 'Cadastros operacionais', roles: ['ADMINISTRADOR'] },
   { id: 'orders', module: 'orders', title: 'Consultar pedidos', hint: 'Lista de pedidos', roles: ['VENDAS'] },
   { id: 'shipping', module: 'shipping', title: 'Expedição', hint: 'Fila de expedição', roles: ['VENDAS'] },

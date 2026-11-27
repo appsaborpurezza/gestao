@@ -1,9 +1,10 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type FormEvent } from 'react'
 import { Copy, Plus, Settings2, Tags } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useIdempotentRpc } from '../../lib/catalog'
 import { CatalogLifecycleDialog, RecordActions, RecordDrawer, SimilarRecords, lifecycleActions, useLifecycle } from '../../ui/records'
 import { toast } from '../../ui/toast'
+import { BulkActions, useRowSelection } from '../../ui/BulkActions'
 import { DataTable, type Column } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
 import { Badge, PageHeader } from '../../ui'
@@ -31,8 +32,9 @@ const productClasses = ['FABRICACAO_PROPRIA', 'TERCEIRO', 'REVENDA_A_VALIDAR', '
 type Editor = { mode: 'new' | 'edit' | 'duplicate'; item?: CatalogItem }
 
 /** Inclusão, edição e duplicação de produto. Código e descrição original não mudam depois de gravados. */
-function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (dirty: boolean) => void; onSaved: () => void }) {
+function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (dirty: boolean) => void; onSaved: (another?: boolean) => void }) {
   const { run, busy } = useIdempotentRpc()
+  const again = useRef(false)
   const [error, setError] = useState('')
   const editing = editor.mode === 'edit' ? editor.item : undefined
   const source = editor.item
@@ -40,6 +42,8 @@ function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (d
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const another = again.current
+    again.current = false
     const form = new FormData(event.currentTarget)
     const input = Object.fromEntries(['code', 'description', 'commercial_description', 'classification', 'unit']
       .map(key => [key, String(form.get(key) ?? '').trim() || null]))
@@ -47,8 +51,8 @@ function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (d
     try {
       await run('save_item', { target: editing?.id ?? null, expected_version: editing?.catalog_version ?? null, input },
         'Não foi possível salvar o produto.')
-      toast(editing ? 'Produto atualizado.' : 'Produto incluído.')
-      onSaved()
+      toast(editing ? 'Produto atualizado.' : another ? 'Produto incluído. Preencha o próximo.' : 'Produto incluído.')
+      onSaved(another)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível salvar o produto.')
     }
@@ -79,7 +83,10 @@ function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (d
       {editing && <p className="ui-muted">A unidade base e as embalagens são configuradas em “Unidade”. Classificação não muda se o produto já tiver pedidos, lotes, demandas, receitas ou embalagens.</p>}
     </fieldset>
     {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
-    <div className="ui-modal-actions"><button disabled={busy}>{busy ? 'Salvando…' : editing ? 'Salvar alterações' : 'Incluir produto'}</button></div>
+    <div className="ui-modal-actions">
+      {editor.mode === 'new' && <button className="secondary" disabled={busy} onClick={() => { again.current = true }}>Salvar e cadastrar outro</button>}
+      <button disabled={busy}>{busy ? 'Salvando…' : editing ? 'Salvar alterações' : 'Incluir produto'}</button>
+    </div>
   </form>
 }
 
@@ -96,6 +103,7 @@ export function ProductCatalog({ items, loading, error, onRetry, canConfigure, o
   const term = useDebouncedValue(filters.term)
   const active = [filters.term, filters.classification, filters.unit, filters.status].filter(Boolean).length
   const [editor, setEditor] = useState<Editor | null>(startNew && canConfigure ? { mode: 'new' } : null)
+  const [formRun, setFormRun] = useState(0)
   const [dirty, setDirty] = useState(false)
   const lifecycle = useLifecycle()
   const lifecycleItem = items?.find(item => item.id === lifecycle.recordId)
@@ -110,6 +118,10 @@ export function ProductCatalog({ items, loading, error, onRetry, canConfigure, o
     && (!filters.status || (filters.status === 'active') === (item.active !== false))
   ), [items, term, filters.classification, filters.unit, filters.status])
 
+  const selection = useRowSelection<CatalogItem>(row => row.id, rows)
+  // Inativar/reativar em massa usa uma entidade por vez; insumos ficam em Cadastros operacionais.
+  const bulkEntity = selection.rows.every(row => row.classification === 'INSUMO') && selection.rows.length ? 'INSUMO' : 'PRODUTO'
+  const mixed = selection.rows.some(row => row.classification === 'INSUMO') && selection.rows.some(row => row.classification !== 'INSUMO')
   const classifications = useMemo(() => [...new Set(items?.map(item => item.classification))].sort(), [items])
 
   const columns: Column<CatalogItem>[] = [
@@ -151,7 +163,14 @@ export function ProductCatalog({ items, loading, error, onRetry, canConfigure, o
         <option value="">Ativos e inativos</option><option value="active">Somente ativos</option><option value="inactive">Somente inativos</option>
       </select>
     </FilterBar>
+    <BulkActions entity={bulkEntity} canChange={canConfigure && !mixed} filename="produtos.csv" onClear={selection.clear}
+      onDone={() => void refresh()}
+      rows={selection.rows.map(row => ({ id: row.id, label: row.original_code + ' · ' + (row.commercial_description ?? row.original_description),
+        active: row.active ?? null, cells: { 'Código': row.original_code, 'Descrição original': row.original_description,
+          'Descrição comercial': row.commercial_description ?? '', 'Classificação': classificationLabels[row.classification] ?? row.classification,
+          Unidade: row.base_unit ?? '', 'Situação': row.active === false ? 'Inativo' : 'Ativo' } }))}/>
     <DataTable caption="Produtos" rows={rows} columns={columns} rowKey={row => row.id} loading={loading} error={error} onRetry={onRetry}
+      selection={{ selected: selection.selected, onChange: selection.onChange, rowLabel: row => row.original_code }}
       preferenceKey="products" filtered={active > 0} onClearFilters={clear}
       empty={{ title: 'Nenhum produto cadastrado', description: 'Importe o catálogo em Administração › Importação ou use “Novo produto”.' }}
       rowActions={canConfigure ? row => {
@@ -166,8 +185,8 @@ export function ProductCatalog({ items, loading, error, onRetry, canConfigure, o
     {canConfigure && <>
       <RecordDrawer open={editor !== null} dirty={dirty} onClose={() => setEditor(null)}
         title={editor?.mode === 'edit' ? 'Editar produto' : editor?.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}>
-        {editor && <ProductForm key={editor.mode + (editor.item?.id ?? '')} editor={editor} onDirty={setDirty}
-          onSaved={() => { setEditor(null); void refresh() }}/>}
+        {editor && <ProductForm key={editor.mode + (editor.item?.id ?? '') + formRun} editor={editor} onDirty={setDirty}
+          onSaved={another => { if (another) { setDirty(false); setFormRun(value => value + 1) } else setEditor(null); void refresh() }}/>}
       </RecordDrawer>
       {/* Insumos usam a entidade INSUMO; as demais classificações, PRODUTO. O banco confere de novo. */}
       <CatalogLifecycleDialog entity={lifecycleItem?.classification === 'INSUMO' ? 'INSUMO' : 'PRODUTO'}
