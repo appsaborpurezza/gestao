@@ -14,6 +14,8 @@ import { OrderBilling } from './OrderBilling'
 import { CommercialDocumentButton, CommercialDocumentSettings } from './CommercialDocument'
 import { OrderReservations } from './OrderReservations'
 import { Combobox } from '../../ui/Combobox'
+import { Modal } from '../../ui/records'
+import { CustomerForm } from '../customers/Customers'
 const date = (value: string | null) => value?.split('-').reverse().join('/') ?? 'A definir'
 const statuses: Record<string, string> = { RASCUNHO: 'Rascunho', CONFIRMADO: 'Confirmado', PARCIAL: 'Parcial', EXPEDIDO: 'Expedido' }
 const statusTone: Record<string, 'neutral' | 'info' | 'warning' | 'success'> = { RASCUNHO: 'neutral', CONFIRMADO: 'info', PARCIAL: 'warning', EXPEDIDO: 'success' }
@@ -69,6 +71,7 @@ function DraftForm({ products, customers, onClose, onSaved, draft }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [customerId, setCustomerId] = useState(draft?.customer_id ?? '')
+  const [newCustomer, setNewCustomer] = useState(false)
   const pending = useRef<{ fingerprint: string; id: string } | null>(null)
   const inFlight = useRef(false)
   const cache = useQueryClient()
@@ -117,17 +120,29 @@ function DraftForm({ products, customers, onClose, onSaved, draft }: {
 
   return <section>
     <h2>{draft ? 'Editar pedido ' + draft.order_number : 'Novo rascunho'}</h2>
+    {/* Cadastro rápido: o pedido em edição (itens, datas e condições) é preservado. */}
+    <Modal open={newCustomer} wide title="Cadastrar cliente" onClose={() => setNewCustomer(false)}>
+      <CustomerForm embedded onClose={() => setNewCustomer(false)} onSaved={async id => {
+        await cache.invalidateQueries({ queryKey: ['orders', 'draft-options'] })
+        setCustomerId(id)
+        setNewCustomer(false)
+      }}/>
+    </Modal>
     {(!customers.length || !products.length) ? <>
       <p>Cadastre um cliente ativo e configure a unidade base de pelo menos um produto para criar pedidos.</p>
+      {!customers.length && <button type="button" className="secondary" onClick={() => setNewCustomer(true)}><Plus aria-hidden="true" size={16}/>Cadastrar cliente</button>}
       <button onClick={onClose}>Voltar</button>
     </> : <form onSubmit={submit}>
       <div className="customer-fields">
-        <Combobox label="Cliente" name="customer_id" required value={customerId} onChange={setCustomerId}
-          options={[
-            ...(draft && !customers.some(customer => customer.id === draft.customer_id)
-              ? [{ value: draft.customer_id, label: draft.customer_name + ' · Inativo', disabled: true }] : []),
-            ...customers.map(customer => ({ value: customer.id, label: customer.legal_name, hint: 'Código ' + customer.customer_number })),
-          ]}/>
+        <div className="ui-field-with-action">
+          <Combobox label="Cliente" name="customer_id" required value={customerId} onChange={setCustomerId}
+            options={[
+              ...(draft && !customers.some(customer => customer.id === draft.customer_id)
+                ? [{ value: draft.customer_id, label: draft.customer_name + ' · Inativo', disabled: true }] : []),
+              ...customers.map(customer => ({ value: customer.id, label: customer.legal_name, hint: 'Código ' + customer.customer_number })),
+            ]}/>
+          <button type="button" className="secondary ui-quick-create" onClick={() => setNewCustomer(true)}><Plus aria-hidden="true" size={16}/>Cadastrar cliente</button>
+        </div>
         <label>Previsão de entrega <input name="delivery_date" type="date" defaultValue={draft?.delivery_date ?? ''}/></label>
         <label>Condição de pagamento <input name="payment_terms" maxLength={254} defaultValue={draft?.finance?.payment_terms ?? ''}/></label>
         <label>Vencimento financeiro <input name="payment_due_date" type="date" defaultValue={draft?.finance?.payment_due_date ?? ''}/></label>

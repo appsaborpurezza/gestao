@@ -42,6 +42,8 @@ type Props<Row> = {
   /** Chave para lembrar colunas e densidade do usuário. */
   preferenceKey?: string
   toolbar?: ReactNode
+  /** Seleção múltipla (ações em massa). As chaves são as de rowKey. */
+  selection?: { selected: Set<string>; onChange: (next: Set<string>) => void; rowLabel?: (row: Row) => string }
 }
 
 const pageSizes = [10, 25, 50, 100]
@@ -83,6 +85,7 @@ export function DataTable<Row>(props: Props<Row>) {
   const setPageSize = serverMode ? props.onPageSizeChange : (size: number) => { setLocalSize(size); setLocalPage(0) }
 
   const visible = columns.filter(column => !prefs.hidden.includes(column.id))
+  const selection = props.selection
 
   const sorted = useMemo(() => {
     if (!rows || serverMode || !sort) return rows
@@ -151,6 +154,20 @@ export function DataTable<Row>(props: Props<Row>) {
         <table>
           <caption className="sr-only">{caption}</caption>
           <thead><tr>
+            {selection && (() => {
+              const keys = pageRows.map(rowKey)
+              const all = keys.length > 0 && keys.every(key => selection.selected.has(key))
+              const some = keys.some(key => selection.selected.has(key))
+              return <th scope="col" className="ui-select-cell">
+                <input type="checkbox" aria-label="Selecionar todos desta página" checked={all}
+                  ref={element => { if (element) element.indeterminate = some && !all }}
+                  onChange={() => {
+                    const next = new Set(selection.selected)
+                    keys.forEach(key => { if (all) next.delete(key); else next.add(key) })
+                    selection.onChange(next)
+                  }}/>
+              </th>
+            })()}
             {visible.map(column => {
               const sortable = !!column.sortValue
               const active = sort?.column === column.id
@@ -168,6 +185,13 @@ export function DataTable<Row>(props: Props<Row>) {
           <tbody>
             {pageRows.map(row => <tr key={rowKey(row)} data-clickable={!!onRowOpen || undefined}
               onClick={onRowOpen ? event => { if (!(event.target as HTMLElement).closest('button,a,input,select,label')) onRowOpen(row) } : undefined}>
+              {selection && <td className="ui-select-cell"><input type="checkbox" checked={selection.selected.has(rowKey(row))}
+                aria-label={'Selecionar ' + (selection.rowLabel?.(row) ?? 'registro')}
+                onChange={event => {
+                  const next = new Set(selection.selected)
+                  if (event.target.checked) next.add(rowKey(row)); else next.delete(rowKey(row))
+                  selection.onChange(next)
+                }}/></td>}
               {visible.map(column => <td key={column.id} data-align={column.align} data-label={column.header}>{column.cell(row)}</td>)}
               {rowActions && <td data-align="end" className="ui-row-actions">{rowActions(row)}</td>}
             </tr>)}

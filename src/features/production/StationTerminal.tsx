@@ -5,7 +5,7 @@ import { todayInSaoPaulo } from '../../lib/periods'
 import { BatchCard, batchState, columns, stateLabels, type Stage } from './ProductionBoard'
 import { batchDeadline, stateTones } from './boardState'
 import { formatStageDuration } from './StageTiming'
-import { stationQueue, useBoardSnapshot } from './boardQuery'
+import { useBoardSnapshot, useStationQueue } from './boardQuery'
 
 const stations = columns.filter(([stage]) => stage !== 'FINALIZADA')
 const stationNames: Record<string, string> = {
@@ -23,10 +23,11 @@ export function StationTerminal({ canOperate }: { canOperate: boolean }) {
     return stations.some(([stage]) => stage === saved) ? saved as Stage : null
   })
   const [selected, setSelected] = useState<string | null>(null)
-  const { board, realtime } = useBoardSnapshot(30)
+  // Totais das estações vêm do resumo; a fila da estação escolhida carrega em páginas de 30.
+  const { board, realtime } = useBoardSnapshot(1)
+  const { query, rows: queue, total } = useStationQueue(station)
   useEffect(() => { if (station) localStorage.setItem(storageKey, station) }, [station])
-  const today = todayInSaoPaulo()
-  const queue = station && board.data ? stationQueue(board.data[station].rows) : []
+  const today = board.data?.today ?? todayInSaoPaulo()
   const current = queue.find(batch => batch.id === selected) ?? queue.find(batch => batchState(batch) !== 'blocked')
 
   return <section className="panel terminal">
@@ -36,13 +37,13 @@ export function StationTerminal({ canOperate }: { canOperate: boolean }) {
       {stations.map(([stage]) => <button key={stage} type="button" aria-pressed={station === stage}
         onClick={() => { setStation(stage); setSelected(null) }}>
         {stationNames[stage]}
-        {board.data && <span className="terminal-count">{board.data[stage].total}</span>}
+        {board.data && <span className="terminal-count">{board.data.columns[stage].total}</span>}
       </button>)}
     </nav>
     {!station && <EmptyState title="Escolha a estação deste terminal" description="A escolha fica salva neste aparelho e pode ser trocada a qualquer momento."/>}
-    {station && board.isPending && <Skeleton lines={5} label="Carregando a fila da estação…"/>}
-    {station && board.isError && <ErrorState title="Fila indisponível" description="O terminal tenta de novo automaticamente." onRetry={() => void board.refetch()}/>}
-    {station && board.data && (queue.length === 0
+    {station && query.isPending && <Skeleton lines={5} label="Carregando a fila da estação…"/>}
+    {station && query.isError && <ErrorState title="Fila indisponível" description="O terminal tenta de novo automaticamente." onRetry={() => void query.refetch()}/>}
+    {station && query.data && (queue.length === 0
       ? <EmptyState title="Nenhuma massada nesta estação" description="Quando uma massada chegar a esta etapa, ela aparece aqui sozinha."/>
       : <div className="terminal-layout">
         <ol className="terminal-queue" aria-label={'Fila de ' + stationNames[station]}>
@@ -72,7 +73,10 @@ export function StationTerminal({ canOperate }: { canOperate: boolean }) {
             : <EmptyState title="Todas as massadas desta estação estão bloqueadas" description="Massadas em recolhimento não podem ser operadas."/>}
         </div>
       </div>)}
-    {board.data && station && board.data[station].total > queue.length && <p className="ui-muted">
-      Exibindo {queue.length} de {board.data[station].total} massadas. As demais aparecem conforme a fila andar.</p>}
+    {station && total > queue.length && <div className="terminal-more">
+      <p className="ui-muted">Exibindo {queue.length} de {total} massadas desta estação.</p>
+      <button type="button" className="secondary" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
+        {query.isFetchingNextPage ? 'Carregando…' : 'Carregar mais'}</button>
+    </div>}
   </section>
 }

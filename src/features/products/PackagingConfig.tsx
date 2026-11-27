@@ -1,6 +1,48 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Trash2, Link2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { CatalogLifecycleDialog, useLifecycle } from '../../ui/records'
+import { Badge } from '../../ui'
+
+type ConfigVersion = { id: string; version: number; packages_per_unit: number; labels_per_unit: number; reference: string; configured_at: string }
+
+/**
+ * Todas as versões da configuração. A mais recente vale para novas ordens; as anteriores ficam congeladas nas OPs.
+ * Excluir só é aceito pelo banco para versão nunca usada em OP, reserva ou saída de acabado.
+ */
+function PackagingVersions({ productId }: { productId: string }) {
+  const cache = useQueryClient()
+  const lifecycle = useLifecycle()
+  const versions = useQuery({
+    queryKey: ['items', 'packing-config', productId, 'versions'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('product_packaging_configs')
+        .select('id,version,packages_per_unit,labels_per_unit,reference,configured_at').eq('product_id', productId).order('version', { ascending: false })
+      if (error) throw error
+      return data as ConfigVersion[]
+    },
+  })
+  if (!versions.data?.length) return null
+  return <section aria-label="Versões da configuração">
+    <h4>Versões registradas</h4>
+    <ul className="ui-dependency-list">
+      {versions.data.map((item, index) => <li key={item.id}>
+        <span>Versão {item.version} · {item.packages_per_unit} embalagem(ns) e {item.labels_per_unit} etiqueta(s) por unidade
+          <small className="ui-muted"> · {new Date(item.configured_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} · {item.reference}</small></span>
+        <span className="ui-inline-actions">
+          {index === 0 ? <Badge tone="success">Vigente</Badge> : <Badge tone="neutral">Anterior</Badge>}
+          <button type="button" className="icon-button" aria-label={`Dependências da versão ${item.version}`} title="Dependências"
+            onClick={() => lifecycle.open(item.id, 'dependencies')}><Link2 aria-hidden="true" size={16}/></button>
+          <button type="button" className="icon-button" aria-label={`Excluir versão ${item.version}`} title="Excluir versão"
+            onClick={() => lifecycle.open(item.id, 'delete')}><Trash2 aria-hidden="true" size={16}/></button>
+        </span>
+      </li>)}
+    </ul>
+    <CatalogLifecycleDialog entity="CONFIG_EMBALAGEM" recordId={lifecycle.recordId} mode={lifecycle.mode} onClose={lifecycle.close}
+      onModeChange={lifecycle.setMode} onDone={() => { lifecycle.close(); void cache.invalidateQueries({ queryKey: ['items', 'packing-config', productId] }) }}/>
+  </section>
+}
 
 export function PackagingConfig({ productId }: { productId: string }) {
   const cache = useQueryClient()
@@ -73,6 +115,7 @@ export function PackagingConfig({ productId }: { productId: string }) {
         <button disabled={busy}>{busy ? 'Salvando…' : 'Salvar nova configuração'}</button>
       </form>}
       {feedback && <p role={feedback.error ? 'alert' : 'status'}>{feedback.message}</p>}
+      <PackagingVersions productId={productId}/>
     </>}
   </details>
 }

@@ -31,6 +31,19 @@ Arquivo-fonte `public/logo.png` (1254×1254, PNG com transparência real). Vers�
 - `SimilarRecords`: aviso não bloqueante de cadastros parecidos enquanto o usuário digita.
 - `toast(texto, tom)` e `<Toaster/>`: aviso discreto, só depois da resposta definitiva do servidor.
 - `friendlyError` (`src/lib/catalog.ts`): nunca mostra SQL cru. `useIdempotentRpc`: mesma chave `request_id` para reenvios do mesmo conteúdo.
+- `SimilarRecords onOpen`: com `onOpen`, cada semelhante ganha "Abrir cadastro" (usado em Clientes, por nome ou CPF/CNPJ).
+- Diálogos aninhados: um cadastro rápido abre um `Modal` dentro de outro (ex.: insumo dentro da receita). O `Modal` só reage ao `close`/`cancel` do próprio `<dialog>`, porque esses eventos sobem pela árvore do React; o formulário interno chama `event.stopPropagation()` no envio para não enviar o formulário de origem.
+- "Salvar e cadastrar outro": botão secundário só na inclusão. Grava, limpa o formulário, mantém o painel aberto e devolve o foco ao primeiro campo. Em edição não aparece.
+
+## Seleção e ações em massa (`src/ui/BulkActions.tsx`, `DataTable selection`)
+- `DataTable selection={{ selected, onChange, rowLabel }}` adiciona a coluna de seleção, com "selecionar todos desta página" (estado intermediário quando parcial).
+- `useRowSelection(key, linhasAtuais)` guarda as linhas escolhidas, então a seleção sobrevive à troca de página e de filtro.
+- `BulkActions` mostra "N selecionados" com Exportar (CSV com `;` e BOM, abre no Excel), Inativar e Reativar. Cada registro passa pela mesma RPC da ação individual, um por vez, e o resultado aparece por registro, com as falhas explicadas. Exclusão definitiva em massa não existe.
+- Em uso: Cadastros operacionais, Produtos e Clientes (Vendas só exporta).
+
+## Receitas (`src/features/recipes/RecipeEditor.tsx`)
+- "Nova receita": código, nome, rendimentos e linhas de ingrediente (insumo pelo `Combobox` ou nome livre da ficha, quantidade e unidade). A unidade vem do insumo escolhido. "Cadastrar insumo" abre o cadastro rápido sem perder as linhas.
+- Menu da versão: Abrir ficha técnica, Nova versão (só a partir de aprovada e sem outra em elaboração), Duplicar receita, Dependências, Histórico e Excluir (versão pendente sem uso; "Excluir receita" quando é a única versão).
 
 Exemplo:
 ```tsx
@@ -40,6 +53,10 @@ const lifecycle = useLifecycle()
 <CatalogLifecycleDialog entity="FORNECEDOR" recordId={lifecycle.recordId} mode={lifecycle.mode}
   onClose={lifecycle.close} onModeChange={lifecycle.setMode} onDone={refresh}/>
 ```
+
+## Usuários (`src/features/administration/ProfileManagement.tsx`)
+- Lista no padrão de cadastro (PageHeader, FilterBar, DataTable) e edição em gaveta com etapa de revisão.
+- "Convidar usuário" e "Senha e convites" chamam a Edge Function `admin-users`. O navegador envia só o token do administrador; a chave secreta fica no Supabase.
 
 ## Workspace (`src/lib/workspace.ts`, `src/ui/QuickActions.tsx`)
 - Favoritos, recentes e departamentos recolhidos por usuário em `localStorage` (`purezza:workspace:<id>`). Guarda apenas identificadores de módulos; permissões são revalidadas ao exibir.
@@ -53,3 +70,11 @@ const lifecycle = useLifecycle()
 - Valores clicáveis nas tabelas (receita, cliente, classificação) aplicam o filtro em todos os painéis e aparecem como chips removíveis.
 - Cartões de indicador levam ao módulo de detalhe (Kanban, Estoque, Desperdícios, Recolhimentos, Pedidos, Expedição).
 - As mesmas tabelas (`panelSections`) geram a tela, o PDF, o Excel e a impressão; a impressão usa `.report-print` e esconde o restante da página.
+## Kanban v2
+
+- Indicadores no topo (`.board-kpis`) são botões: clicar aplica o filtro correspondente e marca o indicador como ativo.
+- Visualizações salvas usam o escopo `production-board`, com as prontas Todas, Atrasadas, Entrega nesta semana, Pausadas e bloqueadas e Mais tempo na etapa.
+- Abas: Quadro por etapa, Por OP (barra de progresso do lote e chips por etapa) e Lista da etapa.
+- Peso sempre em kg com `formatKg` (pt-BR, uma casa decimal).
+- Terminal: fila de 30 em 30 com "Carregar mais"; nunca carrega a fila inteira.
+- Modo TV: só totais operacionais, nunca valores comerciais.

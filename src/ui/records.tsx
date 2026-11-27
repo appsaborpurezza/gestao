@@ -114,8 +114,9 @@ export function Modal({ open, title, onClose, children, wide, drawer, guard }: {
   const requestClose = () => { if (!guard?.()) onClose() }
   // Portal no body: evita formulário dentro de formulário quando o diálogo nasce dentro de um form.
   return createPortal(<dialog ref={ref} className={drawer ? 'ui-drawer' : 'ui-modal'} data-wide={wide || undefined} aria-labelledby={titleId}
-    onCancel={event => { event.preventDefault(); requestClose() }}
-    onClose={() => { if (open) onClose(); (origin.current as HTMLElement | null)?.focus?.() }}>
+    // Eventos de um diálogo aninhado (cadastro rápido) sobem pela árvore do React: só reage ao próprio diálogo.
+    onCancel={event => { if (event.target !== event.currentTarget) return; event.preventDefault(); requestClose() }}
+    onClose={event => { if (event.target !== event.currentTarget) return; if (open) onClose(); (origin.current as HTMLElement | null)?.focus?.() }}>
     <header className="ui-modal-header">
       <h2 id={titleId}>{title}</h2>
       <button type="button" className="icon-button" aria-label="Fechar" onClick={requestClose}><X aria-hidden="true" size={20}/></button>
@@ -306,7 +307,10 @@ export function useLifecycle() {
 }
 
 /** Aviso não bloqueante de cadastros parecidos, consultado no banco enquanto o operador digita. */
-export function SimilarRecords({ entity, term, excludeId }: { entity: CatalogEntity; term: string; excludeId?: string | null }) {
+export function SimilarRecords({ entity, term, excludeId, onOpen }: {
+  entity: CatalogEntity; term: string; excludeId?: string | null
+  /** Quando informado, cada semelhante ganha o botão "Abrir cadastro". */ onOpen?: (id: string) => void
+}) {
   const needle = useDebouncedValue(term.trim(), 400)
   const similar = useQuery({
     queryKey: ['catalog-similar', entity, needle, excludeId ?? null],
@@ -324,6 +328,7 @@ export function SimilarRecords({ entity, term, excludeId }: { entity: CatalogEnt
     Cadastros parecidos já existem. Confira antes de salvar para evitar duplicidade:
     <ul className="ui-plain-list">{similar.data.map(row => <li key={row.id}>
       {row.code && row.code !== row.name && <span className="ui-code">{row.code} </span>}{row.name}{!row.active && ' (inativo)'}
+      {onOpen && <> <button type="button" className="ui-link-button" onClick={() => onOpen(row.id)}>Abrir cadastro<span className="sr-only"> {row.name}</span></button></>}
     </li>)}</ul>
   </div>
 }
