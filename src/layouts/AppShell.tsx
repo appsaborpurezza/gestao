@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { RecordSearch, type RecordMatch } from './RecordSearch'
 
 const departments = [
-  { label: 'Principal', entries: [['dashboard', 'Indicadores']] },
+  { label: 'Principal', entries: [['dashboard', 'Indicadores'], ['alerts', 'Central de alertas'], ['reports', 'Central de relatórios']] },
   { label: 'Comercial', entries: [['orders', 'Pedidos'], ['customers', 'Clientes']] },
   { label: 'Planejamento e produção', entries: [['production-demand', 'Demanda de produção'], ['production-board', 'Kanban de produção'], ['recipes', 'Receitas']] },
   { label: 'Estoque e logística', entries: [['inventory', 'Estoque'], ['shipping', 'Expedição']] },
@@ -12,7 +12,7 @@ const departments = [
 const operational = new Set(['production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
 const commercial = new Set(['orders', 'customers'])
 const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import'])
-const shared = new Set(['dashboard', 'products', 'production-board', 'shipping'])
+const shared = new Set(['dashboard', 'alerts', 'reports', 'products', 'production-board', 'shipping'])
 
 export function canNavigate(id: string, role: string) {
   if (role !== 'ADMINISTRADOR' && role !== 'VENDAS' && role !== 'PRODUCAO') return false

@@ -275,3 +275,12 @@ textarea { padding: 9px; border: 1px solid #8196a8; border-radius: 8px; font: in
   .shell-search-control kbd { display: none; }
 }
 .indicator-table caption { text-align: left; font-weight: 700; padding: .65rem .75rem; }
+.operational-alerts, .report-center { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap: .85rem; list-style: none; padding: 0; }
+.report-center li { display: flex; flex-direction: column; align-items: flex-start; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 1rem; }
+.report-center h2 { font-size: 1.1rem; margin-bottom: 0; }
+.report-center p { flex: 1; color: var(--muted); }
+.operational-alerts li { padding: 1rem; border: 1px solid var(--border); border-inline-start: 4px solid #a16207; border-radius: var(--radius-control); }
+.operational-alerts li[data-severity=critical] { border-inline-start-color: var(--critical); }
+.operational-alerts li > span { color: var(--muted); font-size: .82rem; }
+.operational-alerts h2 { font-size: 1.1rem; margin: .35rem 0; }
+.operational-alerts strong { display: block; font-size: 1.6rem; color: var(--brand-navy); }

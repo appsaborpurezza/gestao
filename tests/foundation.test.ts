@@ -71,6 +71,7 @@ beforeAll(async () => {
     '20261127000200_production_board_realtime.sql',
     '20261127000300_production_board_revision.sql',
     '20261127000400_workspace_search.sql',
+    '20261127000500_operational_alerts.sql',
   ]) {
     await db.exec(await migration(name))
   }
@@ -117,6 +118,16 @@ test('busca global ignora acentos, pagina e respeita o acesso às receitas', asy
   expect((await search('receita ficticia')).rows).toEqual([])
   await asUser(inactive)
   await expect(search('teste')).rejects.toThrow('perfil')
+})
+
+test('alertas operacionais respeitam o perfil e omitem grupos sem ocorrências', async () => {
+  const alerts = () => db.query('select code,quantity::int from public.operational_alerts()')
+  await asUser(production)
+  expect((await alerts()).rows).toEqual([{ code: 'RECIPES_PENDING', quantity: 1 }])
+  await asUser(sales)
+  expect((await alerts()).rows).toEqual([])
+  await asUser(inactive)
+  await expect(alerts()).rejects.toThrow('perfil')
 })
 
 test('rejeita duplicidades e desfaz toda a carga se um ingrediente for inválido', async () => {

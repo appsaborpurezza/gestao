@@ -23,6 +23,8 @@ const RecipeReview = lazy(() => import('./features/recipes/RecipeReview').then(m
 const RecipeAssignments = lazy(() => import('./features/recipes/RecipeAssignments').then(module => ({ default: module.RecipeAssignments })))
 const ProductionBoard = lazy(() => import('./features/production/ProductionBoard').then(module => ({ default: module.ProductionBoard })))
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
+const OperationalAlerts = lazy(() => import('./features/alerts/OperationalAlerts'))
+const ReportCenter = lazy(() => import('./features/reports/ReportCenter'))
 
 const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
 
@@ -85,6 +87,12 @@ function Workspace({ userId }: { userId: string }) {
       {profile.isSuccess && !profile.data && <p role="alert">Esta conta precisa de um perfil ativo.</p>}
       {profile.data && <>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} /></Suspense>}
+        {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
+          <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
+        </Suspense>}
+        {tab === 'reports' && role && <Suspense fallback={<p role="status">Abrindo relatórios…</p>}>
+          <ReportCenter role={role} onNavigate={setTab}/>
+        </Suspense>}
         {tab === 'products' && <section className="panel"><h1>Produtos</h1>
           {target?.module === 'products' && <button type="button" className="secondary" onClick={() => { setUnitItem(null); setTarget(null) }}>Ver todos os produtos</button>}
           {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<p role="status">Abrindo configuração…</p>}>
