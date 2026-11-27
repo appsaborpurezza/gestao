@@ -69,7 +69,7 @@ Em **Indicadores**, consulte o período e use **Exportar PDF** ou **Exportar Exc
 
 O Pareto ordena os motivos de perda por kg registrado, mostra a participação no total e calcula o percentual acumulado a partir dos pesos. A série de produção e perdas pode ser agrupada por dia, semana (a partir de segunda-feira) ou mês. O agrupamento usa somente os dias do período consultado. O PDF e o Excel incluem a série no agrupamento selecionado e o Pareto quando há perdas.
 
-Na visão semanal ou mensal, use **Ver dias** na linha do período para conferir os registros diários que compõem o total. Nessas duas visões, o PDF e o Excel incluem também a série diária completa da consulta. A sessão da aba lembra o último período consultado e o agrupamento por conta e perfil. Use **Voltar ao mês atual** para retornar à visão diária do mês corrente.
+Na visão semanal ou mensal, use **Ver dias** na linha do período para conferir os registros diários que compõem o total. Nessas duas visões, o PDF e o Excel incluem também a série diária completa da consulta. A sessão da aba lembra o último período consultado e o agrupamento por conta e perfil. Os atalhos consultam hoje, ontem, esta semana, semana anterior, este mês, mês anterior ou este ano. As semanas começam na segunda-feira, e as datas são calculadas no calendário de São Paulo.
 
 Na série de produção e perdas, as barras de peso medido e perda registrada compartilham uma escala ajustada à maior quantidade do agrupamento em exibição. Os valores exatos permanecem na tabela.
 

@@ -6,7 +6,8 @@ import { downloadFile } from '../../lib/downloadFile'
 import { buildIndicatorsExcel, buildIndicatorsPdf, dateLabel, type IndicatorSection } from './indicatorExport'
 import { lossPareto } from './lossPareto'
 import { groupProductionSeries, type Grouping, type ProductionDay } from './productionSeries'
-import { dashboardPreferences, defaultDashboardPreferences } from './dashboardPreferences'
+import { dashboardPreferences } from './dashboardPreferences'
+import { dashboardPeriod, dashboardPresets } from './dashboardPeriods'
 
 type Operations = {
   finished_count: number
@@ -66,8 +67,8 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
   const [exportError, setExportError] = useState('')
   const report = useQuery({
     queryKey: ['role-dashboard', accessKey, period],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('role_dashboard', { from_day: period.from, to_day: period.to })
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.rpc('role_dashboard', { from_day: period.from, to_day: period.to }).abortSignal(signal)
       if (error) throw new Error(error.message)
       return data as Report
     },
@@ -167,6 +168,20 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
 
   return <section className="panel indicator-panel">
     <h1>Indicadores</h1>
+    <div className="indicator-filter" role="group" aria-label="Atalhos de período">
+      {dashboardPresets.map(([preset, label]) => {
+        const dates = dashboardPeriod(preset, today)
+        return <button type="button" key={preset} className="secondary" disabled={exporting}
+          aria-pressed={dates.from === period.from && dates.to === period.to}
+          onClick={() => {
+            setFrom(dates.from)
+            setTo(dates.to)
+            setPeriod(dates)
+            setExpandedBucket(null)
+            setExportError('')
+          }}>{label}</button>
+      })}
+    </div>
     <form className="indicator-filter" onSubmit={event => {
       event.preventDefault()
       setExportError('')
@@ -176,15 +191,6 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
       <label>Data inicial <input type="date" required max={to || today} value={from} onChange={event => setFrom(event.target.value)} /></label>
       <label>Data final <input type="date" required min={from} max={today} value={to} onChange={event => setTo(event.target.value)} /></label>
       <button type="submit" disabled={exporting}>Consultar</button>
-      <button type="button" className="secondary" disabled={exporting} onClick={() => {
-        const defaults = defaultDashboardPreferences(today)
-        setFrom(defaults.from)
-        setTo(defaults.to)
-        setPeriod({ from: defaults.from, to: defaults.to })
-        setGrouping(defaults.grouping)
-        setExpandedBucket(null)
-        setExportError('')
-      }}>Voltar ao mês atual</button>
     </form>
     {report.isPending && <p role="status">Carregando indicadores…</p>}
     {report.isError && <p role="alert">Falha ao consultar indicadores. {report.error.message}</p>}
