@@ -1,7 +1,12 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ShieldAlert, X } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
 import { supabase } from '../../lib/supabase'
+import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { Tabs } from '../../ui/Tabs'
+import { lotStatusLabels, lotStatusTones, type LotStatus } from './lotStatus'
 import { parseLotCode } from './lotCode'
 
 type CaseDetails = {
@@ -23,10 +28,22 @@ const success: Record<string, string> = {
   authorize_recall_batch_resume: 'Avaliação de retomada registrada para este caso.',
 }
 
+type CaseRow = { id: string; case_number: number; opened_at: string; closed_at: string | null }
+type Section = 'lots' | 'batches' | 'shipments' | 'actions'
+const caseColumns: Column<CaseRow>[] = [
+  { id: 'case', header: 'Caso', cell: row => <strong>Caso {row.case_number}</strong>, sortValue: row => row.case_number },
+  { id: 'opened', header: 'Aberto em', cell: row => stamp(row.opened_at), sortValue: row => row.opened_at },
+  { id: 'status', header: 'Situação', cell: row => row.closed_at
+    ? <Badge>Encerrado em {stamp(row.closed_at)}</Badge> : <Badge tone="danger">Ativo</Badge> },
+]
+const LotBadge = ({ value }: { value: string }) =>
+  <Badge tone={lotStatusTones[value as LotStatus] ?? 'neutral'}>{lotStatusLabels[value as LotStatus] ?? value.replaceAll('_', ' ')}</Badge>
+
 export function Recall({ canOpen, canResolve }: { canOpen: boolean; canResolve: boolean }) {
   const cache = useQueryClient()
   const [selected, setSelected] = useState('')
   const [opening, setOpening] = useState(false)
+  const [section, setSection] = useState<Section>('lots')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ text: string; error: boolean } | null>(null)
   const inFlight = useRef(false)
@@ -78,6 +95,7 @@ export function Recall({ canOpen, canResolve }: { canOpen: boolean; canResolve: 
       form.reset()
       if (operation === 'open_lot_recall') {
         setSelected(data as string)
+        setSection('lots')
         setOpening(false)
       }
       if (operation !== 'record_recall_action') {
@@ -98,80 +116,119 @@ export function Recall({ canOpen, canResolve }: { canOpen: boolean; canResolve: 
     }
   }
 
+  const open = (id: string) => { setSelected(id); setSection('lots'); setFeedback(null) }
+  const caseData = details.data
+  const activeCount = cases.data?.filter(row => !row.closed_at).length ?? 0
+
   return <section className="panel">
-    <h1>Recolhimentos</h1>
-    {canOpen && (opening ? <form onSubmit={event => void submit(event, 'open_lot_recall')}>
-      <p>A abertura bloqueia o lote de origem e os derivados identificados. Confira o código antes de confirmar.</p>
-      <label>Código interno do lote de origem <input name="lot" required/></label>
-      <label>Motivo do recolhimento <textarea name="reason" maxLength={1000} required rows={3}/></label>
-      <div className="customer-actions">
-        <button disabled={busy}>Confirmar abertura e bloqueio</button>
-        <button type="button" className="secondary" disabled={busy} onClick={() => { setOpening(false); setFeedback(null) }}>Voltar</button>
+    <PageHeader icon={ShieldAlert} title="Recolhimentos"
+      description={activeCount ? `${activeCount} ${activeCount === 1 ? 'recolhimento ativo' : 'recolhimentos ativos'}. Lotes afetados ficam bloqueados até a avaliação.`
+        : 'Bloqueio de lotes, destinos afetados, ações de contato e encerramento com avaliação sanitária.'}
+      actions={canOpen && !opening && <button type="button" onClick={() => { setOpening(true); setFeedback(null) }}>
+        <ShieldAlert aria-hidden="true" size={16}/>Abrir recolhimento</button>}/>
+    {canOpen && opening && <form className="ui-form ui-detail" aria-labelledby="recall-open-title"
+      onSubmit={event => void submit(event, 'open_lot_recall')}>
+      <div className="ui-detail-header">
+        <h2 id="recall-open-title">Abrir recolhimento</h2>
+        <button type="button" className="secondary" disabled={busy} onClick={() => { setOpening(false); setFeedback(null) }}>
+          <X aria-hidden="true" size={16}/>Fechar</button>
       </div>
-    </form> : <button type="button" onClick={() => { setOpening(true); setFeedback(null) }}>Abrir recolhimento</button>)}
-    {feedback && <p role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
-    {cases.isPending && <p role="status">Carregando recolhimentos…</p>}
-    {cases.isError && <p role="alert">Falha ao consultar recolhimentos.</p>}
-    {cases.data?.length === 0 && <p>Nenhum recolhimento cadastrado.</p>}
-    {!!cases.data?.length && <label>Recolhimento <select value={selected} disabled={busy}
-      onChange={event => { setSelected(event.target.value); setFeedback(null) }}>
-      <option value="">Selecione</option>
-      {cases.data.map(incident => <option key={incident.id} value={incident.id}>
-        Caso {incident.case_number} · {stamp(incident.opened_at)} · {incident.closed_at ? 'Encerrado' : 'Ativo'}
-      </option>)}
-    </select></label>}
-    {selected && details.isPending && <p role="status">Carregando detalhes…</p>}
-    {details.isError && <p role="alert">Falha ao consultar o caso.</p>}
-    {details.data && <article>
-      <h2>Caso {details.data.case_number}</h2>
-      <p className="break-code">Origem {details.data.root_code} · {stamp(details.data.opened_at)}</p>
-      <p>{details.data.reason}</p>
-      {details.data.closed_at ? <p>Encerrado em {stamp(details.data.closed_at)} · {details.data.closed_by} · {details.data.close_reference}</p>
-        : <p>Recolhimento ativo.</p>}
-      {canResolve && !details.data.closed_at && <details>
+      <p className="ui-message" data-tone="danger">A abertura bloqueia o lote de origem e os derivados identificados. Confira o código antes de confirmar.</p>
+      <label>Código interno do lote de origem <input name="lot" autoComplete="off" required/></label>
+      <label>Motivo do recolhimento <textarea name="reason" maxLength={1000} required rows={3}/></label>
+      <div className="ui-form-actions">
+        <button type="button" className="secondary" disabled={busy} onClick={() => { setOpening(false); setFeedback(null) }}>Cancelar</button>
+        <button disabled={busy}>{busy ? 'Abrindo…' : 'Confirmar abertura e bloqueio'}</button>
+      </div>
+    </form>}
+    {feedback && <p className="ui-message" data-tone={feedback.error ? 'danger' : 'success'} role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
+    {selected && details.isPending && <Skeleton lines={5} label="Carregando detalhes…"/>}
+    {details.isError && <ErrorState title="Falha ao consultar o caso" onRetry={() => void details.refetch()}/>}
+    {caseData && <article className="ui-detail" aria-labelledby="recall-title">
+      <div className="ui-detail-header">
+        <div>
+          <h2 id="recall-title">Caso {caseData.case_number}</h2>
+          <p className="ui-muted">Origem <span className="ui-code">{caseData.root_code}</span> · aberto em {stamp(caseData.opened_at)}</p>
+        </div>
+        <span className="ui-cell-stack">
+          {caseData.closed_at ? <Badge>Encerrado</Badge> : <Badge tone="danger">Ativo</Badge>}
+          <button type="button" className="secondary" onClick={() => setSelected('')}><X aria-hidden="true" size={16}/>Fechar</button>
+        </span>
+      </div>
+      <p>{caseData.reason}</p>
+      {caseData.closed_at && <dl>
+        <div><dt>Encerrado em</dt><dd>{stamp(caseData.closed_at)}</dd></div>
+        <div><dt>Responsável</dt><dd>{caseData.closed_by}</dd></div>
+        <div><dt>Avaliação</dt><dd>{caseData.close_reference}</dd></div>
+      </dl>}
+      {canResolve && !caseData.closed_at && <details>
         <summary>Encerrar recolhimento</summary>
-        <p>O encerramento mantém os lotes bloqueados e as massadas em andamento sem autorização de retomada.</p>
-        <form onSubmit={event => void submit(event, 'close_lot_recall')}>
+        <p className="ui-muted">O encerramento mantém os lotes bloqueados e as massadas em andamento sem autorização de retomada.</p>
+        <form className="ui-inline-form" onSubmit={event => void submit(event, 'close_lot_recall')}>
           <label>Conclusão ou referência da avaliação sanitária <textarea name="evaluation" maxLength={1000} required rows={3}/></label>
-          <button disabled={busy}>Confirmar encerramento</button>
+          <div><button disabled={busy}>Confirmar encerramento</button></div>
         </form>
       </details>}
-      <h3>Lotes afetados</h3>
-      <ul>{details.data.lots.map(lot => <li className="break-code" key={lot.code}>
-        {lot.code} · {lot.status} · Saldo físico {formatStockQuantity(lot.physical)} {lot.unit}
-      </li>)}</ul>
-      <h3>Massadas afetadas</h3>
-      {details.data.batches.length ? <ul>{details.data.batches.map(batch =>
-        <li key={batch.id}>{batch.code} · {batch.status}
-          {batch.resume_authorized_at && <p>Retomada autorizada neste caso em {stamp(batch.resume_authorized_at)} · {batch.resume_reference}</p>}
-          {!batch.resume_authorized_at && batch.status !== 'FINALIZADA' && <p>Retomada pendente de avaliação.</p>}
-          {canResolve && details.data?.closed_at && !batch.resume_authorized_at && batch.status !== 'FINALIZADA' &&
+      <Tabs label="Seções do recolhimento" value={section} onChange={setSection} items={[
+        { id: 'lots', label: `Lotes (${caseData.lots.length})` },
+        { id: 'batches', label: `Massadas (${caseData.batches.length})` },
+        { id: 'shipments', label: `Destinos (${caseData.shipments.length})` },
+        { id: 'actions', label: `Ações (${caseData.actions.length})` },
+      ]}/>
+      {section === 'lots' && <DataTable caption="Lotes afetados" rows={caseData.lots} rowKey={row => row.code}
+        empty={{ title: 'Nenhum lote vinculado' }} columns={[
+          { id: 'code', header: 'Lote', cell: row => <span className="ui-code">{row.code}</span> },
+          { id: 'status', header: 'Situação', cell: row => <span className="ui-trace-change"><LotBadge value={row.status}/>
+            {row.prior_status && row.prior_status !== row.status && <span className="ui-muted">antes: {lotStatusLabels[row.prior_status as LotStatus] ?? row.prior_status}</span>}</span> },
+          { id: 'physical', header: 'Saldo físico', align: 'end', cell: row => <strong>{formatStockQuantity(row.physical)} {row.unit}</strong> },
+        ]}/>}
+      {section === 'batches' && (caseData.batches.length ? <ul className="ui-plain-list ui-recall-batches">{caseData.batches.map(batch =>
+        <li key={batch.id}>
+          <span className="ui-code">{batch.code}</span> <Badge tone={batch.status === 'FINALIZADA' ? 'success' : 'warning'}>{batch.status.replaceAll('_', ' ')}</Badge>
+          {batch.resume_authorized_at && <p className="ui-muted">Retomada autorizada neste caso em {stamp(batch.resume_authorized_at)} · {batch.resume_reference}</p>}
+          {!batch.resume_authorized_at && batch.status !== 'FINALIZADA' && <p className="ui-muted">Retomada pendente de avaliação.</p>}
+          {canResolve && caseData.closed_at && !batch.resume_authorized_at && batch.status !== 'FINALIZADA' &&
             <details><summary>Avaliar retomada</summary>
-              <form onSubmit={event => void submit(event, 'authorize_recall_batch_resume', batch.id)}>
+              <form className="ui-inline-form" onSubmit={event => void submit(event, 'authorize_recall_batch_resume', batch.id)}>
                 <label>Referência da avaliação sanitária <textarea name="evaluation" maxLength={1000} required rows={2}/></label>
-                <button disabled={busy}>Autorizar retomada neste caso</button>
+                <div><button disabled={busy}>Autorizar retomada neste caso</button></div>
               </form>
             </details>}
-        </li>)}</ul> : <p>Nenhuma massada vinculada.</p>}
-      <h3>Destinos afetados</h3>
-      {details.data.shipments.length ? <ul>{details.data.shipments.map(shipment => <li key={shipment.id} className="break-code">
-        Pedido {shipment.order_number} · {shipment.customer} · {shipment.code} · {formatStockQuantity(shipment.quantity)} {shipment.unit}
-        {' · '}{stamp(shipment.dispatched_at)}
-      </li>)}</ul> : <p>Nenhum despacho vinculado.</p>}
-      <h3>Ações e contatos</h3>
-      <form onSubmit={event => void submit(event, 'record_recall_action')}>
-        <label>Despacho vinculado <select name="shipment">
-          <option value="">Ação geral</option>
-          {details.data.shipments.map(shipment => <option key={shipment.id} value={shipment.id}>
-            Pedido {shipment.order_number} · {shipment.customer} · {stamp(shipment.dispatched_at)}
-          </option>)}
-        </select></label>
-        <label>Ação realizada <textarea name="action" maxLength={1000} rows={2} required/></label>
-        <button disabled={busy}>Registrar ação</button>
-      </form>
-      {details.data.actions.length ? <ul>{details.data.actions.map(action => <li key={action.id}>
-        {stamp(action.recorded_at)} · {action.operator} · {action.note}
-      </li>)}</ul> : <p>Nenhuma ação registrada.</p>}
+        </li>)}</ul> : <p className="ui-muted">Nenhuma massada vinculada.</p>)}
+      {section === 'shipments' && <DataTable caption="Destinos afetados" rows={caseData.shipments} rowKey={row => row.id}
+        empty={{ title: 'Nenhum despacho vinculado' }} columns={[
+          { id: 'order', header: 'Pedido e cliente', cell: row => <span className="ui-cell-stack"><strong>Pedido {row.order_number}</strong><span>{row.customer}</span></span> },
+          { id: 'code', header: 'Lote', cell: row => <span className="ui-code">{row.code}</span> },
+          { id: 'quantity', header: 'Quantidade', align: 'end', cell: row => formatStockQuantity(row.quantity) + ' ' + row.unit },
+          { id: 'dispatched', header: 'Despacho', cell: row => stamp(row.dispatched_at) },
+        ]}/>}
+      {section === 'actions' && <>
+        <form className="ui-inline-form" onSubmit={event => void submit(event, 'record_recall_action')}>
+          <label>Despacho vinculado <select name="shipment">
+            <option value="">Ação geral</option>
+            {caseData.shipments.map(shipment => <option key={shipment.id} value={shipment.id}>
+              Pedido {shipment.order_number} · {shipment.customer} · {stamp(shipment.dispatched_at)}
+            </option>)}
+          </select></label>
+          <label>Ação realizada <textarea name="action" maxLength={1000} rows={2} required/></label>
+          <div><button disabled={busy}>Registrar ação</button></div>
+        </form>
+        <DataTable caption="Ações e contatos" rows={caseData.actions} rowKey={row => row.id}
+          empty={{ title: 'Nenhuma ação registrada' }} columns={[
+            { id: 'when', header: 'Horário e responsável', cell: row => <span className="ui-cell-stack"><span>{stamp(row.recorded_at)}</span><span>{row.operator}</span></span> },
+            { id: 'note', header: 'Ação', cell: row => row.note },
+            { id: 'shipment', header: 'Despacho', cell: row => {
+              const shipment = caseData.shipments.find(item => item.id === row.shipment_id)
+              return shipment ? 'Pedido ' + shipment.order_number + ' · ' + shipment.customer : 'Ação geral'
+            } },
+          ]}/>
+      </>}
     </article>}
+    <DataTable caption="Recolhimentos" rows={cases.data} columns={caseColumns} rowKey={row => row.id}
+      loading={cases.isPending} error={cases.isError} onRetry={() => void cases.refetch()}
+      empty={{ title: 'Nenhum recolhimento cadastrado', description: 'Quando um lote precisar ser recolhido, abra o caso por aqui.' }}
+      onRowOpen={row => open(row.id)}
+      rowActions={row => <button type="button" className="secondary" disabled={busy} onClick={() => open(row.id)}>
+        {row.id === selected ? 'Aberto' : 'Abrir'}</button>}/>
   </section>
 }

@@ -1,4 +1,6 @@
 import { formatStockQuantity } from '../../lib/decimal'
+import { Badge, EmptyState } from '../../ui'
+import { DataTable, type Column } from '../../ui/DataTable'
 
 type Batch = {
   id: string; batch_code: string; sequence: number; status: string; production_number: string
@@ -29,74 +31,86 @@ const amount = (value: string, unit: string) => formatStockQuantity(value) + ' '
 const readable = (value: string) => value.replaceAll('_', ' ')
 
 function LotLink({ code, onFind }: { code: string; onFind: (code: string) => void }) {
-  return <button className="secondary break-code" type="button" onClick={() => onFind(code)} aria-label={'Consultar lote ' + code}>
+  return <button className="ui-link-button ui-code" type="button" onClick={() => onFind(code)} aria-label={'Consultar lote ' + code}>
     {code}
   </button>
 }
 
 export function ProductionGenealogy({ data, onFind }: { data: Genealogy; onFind: (code: string) => void }) {
   const batchCodes = new Map(data.batches.map(batch => [batch.id, batch.batch_code]))
-  return <section>
-    <h3>Fabricação própria</h3>
-    {data.batches.length === 0 && <p>Nenhuma massada vinculada a estes lotes.</p>}
-    {data.batches.map(batch => <article key={batch.id}>
-      <h4>OP {batch.production_number} · {batch.batch_code} · {readable(batch.status)}</h4>
-      <p>{batch.item_code} · {batch.product} · {batch.recipe_name}, versão {batch.recipe_version}</p>
-      {batch.output_code ? <>
-        <p>Acabado <LotLink code={batch.output_code} onFind={onFind}/> · {batch.output_status}</p>
-        <p>{batch.output_units && amount(batch.output_units, 'un')}
-          {batch.nominal_kg && ' · Nominal ' + amount(batch.nominal_kg, 'kg')}
-          {batch.actual_kg && ' · Medido ' + amount(batch.actual_kg, 'kg')}</p>
-        {batch.finished_at && <p>Finalizado em {stamp(batch.finished_at)} · {batch.finished_by}</p>}
-      </> : <p>Acabado ainda não registrado.</p>}
+  const batchCell = (id: string, stage: string) =>
+    <span className="ui-cell-stack"><span className="ui-code">{batchCodes.get(id)}</span><span>{readable(stage)}</span></span>
+  const inputColumns: Column<Link>[] = [
+    { id: 'batch', header: 'Massada e etapa', cell: row => batchCell(row.batch_id, row.stage) },
+    { id: 'material', header: 'Insumo e lote', cell: row => <span className="ui-cell-stack">
+      <strong>{row.material}</strong><LotLink code={row.source_code} onFind={onFind}/>
+      <span>Lote original {row.source_original_lot} · {row.location}</span></span> },
+    { id: 'origin', header: 'Origem', cell: row => <span className="ui-cell-stack">
+      <span>{row.manufacturer}{row.supplier && ' · ' + row.supplier}</span>
+      <span>{row.invoice_number ? 'NF ' + row.invoice_number : row.opening_invoice ?? row.opening_reference ?? 'Documento não informado'}</span>
+      {row.expires_on && <span>Validade {row.expires_on.split('-').reverse().join('/')}</span>}</span> },
+    { id: 'consumed', header: 'Consumo', align: 'end', cell: row => <span className="ui-cell-stack">
+      <strong>{amount(row.quantity, row.unit)}</strong><span>{stamp(row.consumed_at)} · {row.operator}</span></span> },
+  ]
+  const useColumns: Column<Link>[] = [
+    { id: 'lot', header: 'Lote consultado', cell: row => <span className="ui-code">{row.source_code}</span> },
+    { id: 'batch', header: 'Massada e etapa', cell: row => batchCell(row.batch_id, row.stage) },
+    { id: 'material', header: 'Insumo', cell: row => row.material },
+    { id: 'consumed', header: 'Consumo', align: 'end', cell: row => <span className="ui-cell-stack">
+      <strong>{amount(row.quantity, row.unit)}</strong><span>{stamp(row.consumed_at)} · {row.operator}</span></span> },
+  ]
+  const destinationColumns: Column<Genealogy['destinations'][number]>[] = [
+    { id: 'order', header: 'Pedido e cliente', cell: row => <span className="ui-cell-stack"><strong>Pedido {row.order_number}</strong><span>{row.customer_name}</span></span> },
+    { id: 'lot', header: 'Lote acabado', cell: row => <LotLink code={row.output_code} onFind={onFind}/> },
+    { id: 'quantity', header: 'Quantidade', align: 'end', cell: row => amount(row.quantity, row.unit) },
+    { id: 'dispatched', header: 'Despacho', cell: row => <span className="ui-cell-stack"><span>{stamp(row.dispatched_at)}</span><span>{row.operator}</span></span> },
+    { id: 'delivered', header: 'Recebimento', cell: row => row.delivered_at ? stamp(row.delivered_at) : <Badge tone="warning">Pendente</Badge> },
+  ]
+
+  return <section className="ui-genealogy" aria-label="Fabricação própria">
+    {data.batches.length === 0 && <EmptyState title="Nenhuma massada vinculada" description="Estes lotes não participaram de produção própria."/>}
+    {data.batches.map(batch => <article key={batch.id} className="ui-detail">
+      <div className="ui-detail-header">
+        <div>
+          <h3>OP {batch.production_number} · <span className="ui-code">{batch.batch_code}</span></h3>
+          <p className="ui-muted">{batch.item_code} · {batch.product} · {batch.recipe_name}, versão {batch.recipe_version}</p>
+        </div>
+        <Badge tone={batch.status === 'FINALIZADA' ? 'success' : 'info'}>{readable(batch.status)}</Badge>
+      </div>
+      {batch.output_code ? <dl>
+        <div><dt>Lote acabado</dt><dd><LotLink code={batch.output_code} onFind={onFind}/></dd></div>
+        {batch.output_status && <div><dt>Situação do acabado</dt><dd>{readable(batch.output_status)}</dd></div>}
+        {batch.output_units && <div><dt>Unidades</dt><dd>{amount(batch.output_units, 'un')}</dd></div>}
+        {batch.nominal_kg && <div><dt>Nominal</dt><dd>{amount(batch.nominal_kg, 'kg')}</dd></div>}
+        {batch.actual_kg && <div><dt>Medido</dt><dd>{amount(batch.actual_kg, 'kg')}</dd></div>}
+        {batch.finished_at && <div><dt>Finalizado</dt><dd>{stamp(batch.finished_at)} · {batch.finished_by}</dd></div>}
+      </dl> : <p className="ui-muted">Acabado ainda não registrado.</p>}
     </article>)}
-    {data.inputs.length > 0 && <section>
-      <h4>Lotes usados para fabricar o acabado</h4>
-      <div className="table-scroll"><table>
-        <thead><tr><th>Massada e etapa</th><th>Insumo e lote</th><th>Origem</th><th>Consumo</th></tr></thead>
-        <tbody>{data.inputs.map(row => <tr key={row.movement_id}>
-          <td>{batchCodes.get(row.batch_id)} · {readable(row.stage)}</td>
-          <td>{row.material} · {row.kind}<br/><LotLink code={row.source_code} onFind={onFind}/><br/>
-            Lote original {row.source_original_lot} · {row.location}</td>
-          <td>{row.manufacturer}{row.supplier && ' · ' + row.supplier}<br/>
-            {row.invoice_number ? 'NF ' + row.invoice_number : row.opening_invoice ?? row.opening_reference ?? 'Documento não informado'}
-            {row.expires_on && <div>Validade {row.expires_on.split('-').reverse().join('/')}</div>}
-          </td>
-          <td>{amount(row.quantity, row.unit)}<br/>{stamp(row.consumed_at)} · {row.operator}</td>
-        </tr>)}</tbody>
-      </table></div>
-    </section>}
-    {data.uses.length > 0 && <section>
-      <h4>Onde o lote consultado foi usado</h4>
-      <ul>{data.uses.map(row => <li key={row.movement_id} className="break-code">
-        {row.source_code} · {batchCodes.get(row.batch_id)} · {row.material} · {readable(row.stage)} · {amount(row.quantity, row.unit)}
-        {' · '}{stamp(row.consumed_at)} · {row.operator}
-      </li>)}</ul>
-    </section>}
-    {data.water.length > 0 && <section>
-      <h4>Água de processo</h4>
-      <ul>{data.water.map(row => <li key={row.id}>
-        {batchCodes.get(row.batch_id)} · {amount(row.quantity, row.unit)} · {row.source}
+    {data.inputs.length > 0 && <>
+      <h3>Lotes usados para fabricar o acabado</h3>
+      <DataTable caption="Lotes usados para fabricar o acabado" rows={data.inputs} columns={inputColumns} rowKey={row => row.movement_id}/>
+    </>}
+    {data.uses.length > 0 && <>
+      <h3>Onde o lote consultado foi usado</h3>
+      <DataTable caption="Onde o lote consultado foi usado" rows={data.uses} columns={useColumns} rowKey={row => row.movement_id}/>
+    </>}
+    {data.water.length > 0 && <>
+      <h3>Água de processo</h3>
+      <ul className="ui-plain-list">{data.water.map(row => <li key={row.id}>
+        <span className="ui-code">{batchCodes.get(row.batch_id)}</span> · {amount(row.quantity, row.unit)} · {row.source}
         {' · '}Controle {row.control_reference} · {stamp(row.recorded_at)} · {row.operator}
       </li>)}</ul>
-    </section>}
-    {data.losses.length > 0 && <section>
-      <h4>Perdas de massa registradas</h4>
-      <ul>{data.losses.map(row => <li key={row.id}>
-        {batchCodes.get(row.batch_id)} · {readable(row.operation)} · {amount(row.quantity, 'kg')}
+    </>}
+    {data.losses.length > 0 && <>
+      <h3>Perdas de massa registradas</h3>
+      <ul className="ui-plain-list">{data.losses.map(row => <li key={row.id}>
+        <span className="ui-code">{batchCodes.get(row.batch_id)}</span> · {readable(row.operation)} · <strong>{amount(row.quantity, 'kg')}</strong>
         {' · '}{row.reason} · {row.destination} · {stamp(row.occurred_at)} · {row.operator}
       </li>)}</ul>
-    </section>}
-    {data.destinations.length > 0 && <section>
-      <h4>Destinos dos acabados vinculados</h4>
-      <div className="table-scroll"><table>
-        <thead><tr><th>Pedido e cliente</th><th>Lote acabado</th><th>Quantidade</th><th>Despacho</th><th>Recebimento</th></tr></thead>
-        <tbody>{data.destinations.map(row => <tr key={row.id}>
-          <td>{row.order_number} · {row.customer_name}</td><td><LotLink code={row.output_code} onFind={onFind}/></td>
-          <td>{amount(row.quantity,row.unit)}</td><td>{stamp(row.dispatched_at)} · {row.operator}</td>
-          <td>{row.delivered_at ? stamp(row.delivered_at) : 'Pendente'}</td>
-        </tr>)}</tbody>
-      </table></div>
-    </section>}
+    </>}
+    {data.destinations.length > 0 && <>
+      <h3>Destinos dos acabados vinculados</h3>
+      <DataTable caption="Destinos dos acabados vinculados" rows={data.destinations} columns={destinationColumns} rowKey={row => row.id}/>
+    </>}
   </section>
 }
