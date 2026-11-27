@@ -154,7 +154,8 @@ function Workspace({ userId }: { userId: string }) {
           <OperationalCatalogs/>
         </Suspense>}
         {tab === 'inventory' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo estoque…</p>}>
-          <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}/>
+          <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}
+            initialLot={target?.record_id} onOpen={id => navigate({ module: 'inventory', recordId: id })}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
           <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}

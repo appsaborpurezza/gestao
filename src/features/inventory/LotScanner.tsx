@@ -96,18 +96,17 @@ export function LotScanner({ onFind }: { onFind: (code: string) => void }) {
     onFind(code)
   }
 
-  return <section aria-label="Localizar lote">
-    <h2>Localizar lote</h2>
+  return <section aria-label="Localizar lote" className="lot-finder">
     <form onSubmit={submit}>
-      <label>Código interno <input value={text} onChange={event => setText(event.target.value)}
-        autoComplete="off" spellCheck={false} required/></label>
-      <button>Consultar lote</button>
+      <label>Localizar lote pelo código interno <input value={text} onChange={event => setText(event.target.value)}
+        autoComplete="off" spellCheck={false} required placeholder="Digite ou use o leitor"/></label>
+      <button className="secondary">Consultar lote</button>
+      <button type="button" className="secondary" onClick={() => {
+        setError('')
+        setActive(current => !current)
+      }}>{active ? 'Desligar câmera' : 'Ler QR com a câmera'}</button>
     </form>
-    <button type="button" className="secondary" onClick={() => {
-      setError('')
-      setActive(current => !current)
-    }}>{active ? 'Desligar câmera' : 'Ler QR com a câmera'}</button>
     {active && <video ref={video} className="lot-camera" muted playsInline aria-label="Prévia da câmera para leitura do QR"/>}
-    {error && <p role="alert">{error}</p>}
+    {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
   </section>
 }
