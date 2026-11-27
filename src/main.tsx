@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
@@ -6,7 +6,12 @@ import { AppShell } from './layouts/AppShell'
 import type { RecordMatch } from './layouts/RecordSearch'
 import { Access } from './features/auth/Access'
 import { supabase } from './lib/supabase'
+import { useHashRoute } from './lib/routes'
+import { canNavigate } from './layouts/navigation'
+import { ErrorState, ForbiddenState, Skeleton } from './ui'
+import './styles/tokens.css'
 import './styles.css'
+import './styles/shell.css'
 
 const ImportForm = lazy(() => import('./features/import/ImportForm').then(module => ({ default: module.ImportForm })))
 const Inventory = lazy(() => import('./features/inventory/Inventory').then(module => ({ default: module.Inventory })))
@@ -30,8 +35,19 @@ const ProfileManagement = lazy(() => import('./features/administration/ProfileMa
 const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
 
 function Workspace({ userId }: { userId: string }) {
-  const [tab, setTab] = useState('dashboard')
-  const [target, setTarget] = useState<RecordMatch | null>(null)
+  const [route, navigate] = useHashRoute()
+  const tab = route.module
+  const setTab = (module: string) => navigate({ module, recordId: null })
+  const [targetMeta, setTargetMeta] = useState<RecordMatch | null>(null)
+  // O registro aberto vem da URL; o rótulo da busca só complementa a exibição.
+  const target = useMemo<RecordMatch | null>(() => route.recordId
+    ? (targetMeta?.record_id === route.recordId && targetMeta.module === route.module
+      ? targetMeta : { module: route.module as RecordMatch['module'], record_id: route.recordId, label: '', reference: '' })
+    : null, [route, targetMeta])
+  const setTarget = (record: RecordMatch | null) => {
+    setTargetMeta(record)
+    navigate(record ? { module: record.module, recordId: record.record_id } : { module: route.module, recordId: null })
+  }
   const [unitItem, setUnitItem] = useState<string | null>(null)
   const [recipeReview, setRecipeReview] = useState<{ id: string; title: string } | null>(null)
   const profile = useQuery({
@@ -72,20 +88,20 @@ function Workspace({ userId }: { userId: string }) {
   const productForUnits = catalog.data?.find(product => product.id === unitItem)
 
   return <AppShell active={tab} role={role} name={profile.data?.display_name} accountScope={`${userId}:${role}`}
-    onNavigate={id => { setTarget(null); setTab(id) }}
+    onNavigate={id => { setTargetMeta(null); setTab(id) }}
     onOpenRecord={record => {
       setUnitItem(null)
       setRecipeReview(null)
       setTarget(record)
-      setTab(record.module)
     }}
     onSignOut={async () => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
     }}>
-      {profile.isPending && <p role="status">Verificando acesso…</p>}
-      {profile.isError && <div role="alert"><p>Falha ao consultar o perfil.</p><button type="button" onClick={() => void profile.refetch()}>Tentar novamente</button></div>}
-      {profile.isSuccess && !profile.data && <p role="alert">Esta conta precisa de um perfil ativo.</p>}
+      {profile.isPending && <Skeleton lines={4} label="Verificando acesso…"/>}
+      {profile.isError && <ErrorState title="Falha ao consultar o perfil" onRetry={() => void profile.refetch()}/>}
+      {profile.isSuccess && !profile.data && <ForbiddenState description="Esta conta precisa de um perfil ativo. Procure a administração."/>}
+      {role && !canNavigate(tab, role) && <ForbiddenState description="Este endereço não existe ou não está disponível para o seu perfil."/>}
       {profile.data && <>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} /></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>

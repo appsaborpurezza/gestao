@@ -18,7 +18,7 @@ const fixture: CommercialDocument = {
     installments: [{ due_on: '2026-12-10', amount: '60.00' }, { due_on: '2026-12-24', amount: '60.00' }],
   },
 }
-const logo = async () => 'data:image/png;base64,' + (await readFile(new URL('../public/logo.png', import.meta.url))).toString('base64')
+const logo = async () => 'data:image/png;base64,' + (await readFile(new URL('../public/logo-512.png', import.meta.url))).toString('base64')
 
 test('documento comercial com um item cabe em A4 e a mesma versão gera os mesmos bytes', async () => {
   const asset = await logo()

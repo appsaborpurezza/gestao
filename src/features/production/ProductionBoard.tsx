@@ -232,7 +232,7 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
     </dialog>
     {canStart && <dialog ref={tv} className="board-tv" aria-labelledby="board-tv-title">
       <header>
-        <img className="shell-logo" src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas" width={56} height={56}/>
+        <img className="shell-logo" src={import.meta.env.BASE_URL + 'logo-128.webp'} alt="Sabor Purezza Massas" width={56} height={56}/>
         <h2 id="board-tv-title">Gestão à vista · Produção</h2>
         <button type="button" className="secondary" onClick={() => tv.current?.close()}>Fechar gestão à vista</button>
       </header>
