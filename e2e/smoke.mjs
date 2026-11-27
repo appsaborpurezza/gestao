@@ -72,7 +72,7 @@ for (const user of users) {
         await page.keyboard.press('Control+k')
         await page.keyboard.type('massa')
         await page.waitForTimeout(1500)
-        const hits = await page.locator('[role=dialog] [role=option], [role=dialog] li').count()
+        const hits = await page.locator('dialog.shell-search li').count()
         record(user, 'busca global Ctrl+K ("massa")', hits > 0, `${hits} resultado(s)`)
         await page.keyboard.press('Escape'); await page.keyboard.press('Escape')
         await page.click('.shell-user-trigger')
