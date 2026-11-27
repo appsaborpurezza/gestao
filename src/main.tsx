@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { AppShell } from './layouts/AppShell'
 import type { RecordMatch } from './layouts/RecordSearch'
 import { Access } from './features/auth/Access'
-import { supabase } from './lib/supabase'
+import { invitedFromLink, supabase } from './lib/supabase'
 import { formatRoute, useHashRoute } from './lib/routes'
 import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
@@ -148,7 +148,8 @@ function Workspace({ userId }: { userId: string }) {
             <RecipeReview key={recipeReview.id} versionId={recipeReview.id} title={recipeReview.title}
               canEdit={role === 'ADMINISTRADOR'} canApprove={profile.data.can_approve_recipe} onClose={() => setRecipeReview(null)}/>
           </Suspense>
-        </section> : <RecipeList recipes={recipes.data} loading={recipes.isFetching} error={recipes.isError}
+        </section> : <RecipeList key={'recipes:' + actionKey} startNew={action === 'novo'} canAuthor={role === 'ADMINISTRADOR'}
+          canRemove={role === 'ADMINISTRADOR' && profile.data.can_approve_recipe} recipes={recipes.data} loading={recipes.isFetching} error={recipes.isError}
           onRetry={() => void recipes.refetch()} focused={target?.module === 'recipes'}
           onShowAll={() => { setRecipeReview(null); setTarget(null) }} onOpen={setRecipeReview}/>)}
         {tab === 'import' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo importação…</p>}>
@@ -203,7 +204,7 @@ function Workspace({ userId }: { userId: string }) {
 
 function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
-  const [recovery, setRecovery] = useState(false)
+  const [recovery, setRecovery] = useState(invitedFromLink)
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === 'PASSWORD_RECOVERY') setRecovery(true)

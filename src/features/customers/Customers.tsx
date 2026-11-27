@@ -7,7 +7,9 @@ import { DataTable, type Column, type SortState } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
 import { SavedViews } from '../../ui/SavedViews'
-import { CatalogLifecycleDialog, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
+import { CatalogLifecycleDialog, RecordActions, SimilarRecords, lifecycleActions, useLifecycle } from '../../ui/records'
+import { toast } from '../../ui/toast'
+import { BulkActions, useRowSelection } from '../../ui/BulkActions'
 
 /** Monta um filtro `or` do PostgREST seguro para texto livre. */
 export function customerSearchFilter(term: string) {
@@ -31,7 +33,15 @@ type Row = { id: string; customer_number: number; legal_name: string; trade_name
 
 type Existing = { id: string; version: number } & Record<string, string | boolean | number | null>
 
-function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () => void }) {
+/**
+ * Inclusão e edição de cliente. Em modo embutido (cadastro rápido dentro do pedido) devolve o id gravado
+ * e não fecha a tela de origem. Nunca usa confirm() do navegador.
+ */
+export function CustomerForm({ customer, onClose, onSaved, embedded = false, onOpenExisting }: {
+  customer?: Existing; onClose: () => void; onSaved?: (id: string, name: string) => Promise<void> | void; embedded?: boolean
+  onOpenExisting?: (id: string) => void
+}) {
+  const [probe, setProbe] = useState({ name: '', document: '' })
   const cache = useQueryClient()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +49,9 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   const request = useRef<{ fingerprint: string; id: string } | null>(null)
   const inFlight = useRef(false)
   const [dirty, setDirty] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [formKey, setFormKey] = useState(0)
+  const again = useRef(false)
   const value = (key: string) => String(customer?.[key] ?? '')
   useEffect(() => {
     if (!dirty) return
@@ -47,7 +60,7 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
   const close = () => {
-    if (dirty && !window.confirm('Há alterações não salvas. Deseja descartá-las?')) return
+    if (dirty && !confirming) { setConfirming(true); return }
     onClose()
   }
   const input = (name: string, label: string) => <label key={name}>{label}
@@ -58,7 +71,11 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    // O formulário embutido vive em um portal: o envio não pode chegar ao formulário do pedido.
+    event.stopPropagation()
     if (inFlight.current) return
+    const another = again.current
+    again.current = false
     const form = new FormData(event.currentTarget)
     const input = { ...Object.fromEntries(form), active: form.has('active') }
     const fingerprint = JSON.stringify(input)
@@ -69,7 +86,7 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
     setBusy(true)
     setError('')
     try {
-      const { error } = await supabase.rpc('save_customer', {
+      const { data: savedId, error } = await supabase.rpc('save_customer', {
         target_customer: customer?.id ?? null, expected_version: customer?.version ?? null,
         input, request_id: request.current.id,
       })
@@ -83,7 +100,17 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
       }
       await cache.invalidateQueries({ queryKey: ['customers'] })
       setDirty(false)
-      onClose()
+      setConfirming(false)
+      if (onSaved) await onSaved(savedId as string, String(form.get('legal_name') ?? ''))
+      if (another) {
+        toast('Cliente cadastrado. Preencha o próximo.')
+        request.current = null
+        setKind('PF')
+        setFormKey(value => value + 1)
+      } else {
+        toast(customer ? 'Alterações salvas.' : 'Cliente cadastrado.')
+        onClose()
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Falha ao salvar o cliente.')
     } finally {
@@ -92,13 +119,20 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
     }
   }
 
-  return <section className="panel ui-form">
-    <header className="ui-form-header">
+  return <section className={embedded ? 'ui-form' : 'panel ui-form'}>
+    {!embedded && <header className="ui-form-header">
       <button type="button" className="icon-button" aria-label="Voltar para a lista" onClick={close}><ArrowLeft aria-hidden="true" size={20}/></button>
       <div><h2>{customer ? 'Editar cliente' : 'Novo cliente'}</h2>
         <p>{customer ? `Código ${value('customer_number')} · versão ${customer.version}` : 'Campos com * são obrigatórios.'}</p></div>
-    </header>
-    <form onSubmit={save} onChange={() => setDirty(true)} aria-busy={busy}>
+    </header>}
+    {confirming && <div className="ui-message" data-tone="danger" role="alert">
+      Existem alterações não salvas.
+      <span className="ui-inline-actions">
+        <button type="button" className="secondary" onClick={() => setConfirming(false)}>Continuar editando</button>
+        <button type="button" className="danger" onClick={onClose}>Descartar alterações</button>
+      </span>
+    </div>}
+    <form key={formKey} onSubmit={save} onChange={() => setDirty(true)} aria-busy={busy}>
       <fieldset className="ui-fieldset">
         <legend>Identificação</legend>
         <div className="customer-fields">
@@ -106,13 +140,18 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
             <option value="PF">Pessoa física</option><option value="PJ">Pessoa jurídica</option>
           </select></label>
           <label>{kind === 'PF' ? 'Nome completo' : 'Razão social'} <span className="ui-required" aria-hidden="true">*</span>
-            <input name="legal_name" defaultValue={value('legal_name')} required maxLength={180}/>
+            <input name="legal_name" defaultValue={value('legal_name')} required maxLength={180}
+              onChange={event => setProbe(current => ({ ...current, name: event.target.value }))}/>
           </label>
           <label>{kind === 'PF' ? 'CPF' : 'CNPJ'}
-            <input name="document" defaultValue={value('document')} maxLength={24} inputMode={kind === 'PF' ? 'numeric' : 'text'}/>
+            <input name="document" defaultValue={value('document')} maxLength={24} inputMode={kind === 'PF' ? 'numeric' : 'text'}
+              onChange={event => setProbe(current => ({ ...current, document: event.target.value }))}/>
           </label>
           {identity.map(([name, label]) => input(name, label))}
         </div>
+        {/* Aviso antes de gravar; a unicidade definitiva do documento continua no banco. */}
+        <SimilarRecords entity="CLIENTE" term={probe.document.replace(/\D/g, '').length >= 11 ? probe.document : probe.name}
+          excludeId={customer?.id} onOpen={onOpenExisting}/>
       </fieldset>
       <fieldset className="ui-fieldset">
         <legend>Endereço</legend>
@@ -142,7 +181,8 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
       <div className="ui-form-actions">
         {dirty && !busy && <span className="ui-form-dirty" role="status">Alterações não salvas</span>}
         <button type="button" className="secondary" disabled={busy} onClick={close}>Cancelar</button>
-        <button disabled={busy}><Save aria-hidden="true" size={18}/>{busy ? 'Salvando…' : 'Salvar cliente'}</button>
+        {!customer && !embedded && <button className="secondary" disabled={busy} onClick={() => { again.current = true }}>Salvar e cadastrar outro</button>}
+        <button disabled={busy}><Save aria-hidden="true" size={18}/>{busy ? 'Salvando…' : embedded ? 'Cadastrar e selecionar' : 'Salvar cliente'}</button>
       </div>
     </form>
   </section>
@@ -182,6 +222,7 @@ export function Customers({ initialCustomer, onOpen, admin = false, startNew = f
       return { data: data as Row[], count: count ?? 0 }
     },
   })
+  const selection = useRowSelection<Row>(row => row.id, list.data?.data)
   const details = useQuery({
     queryKey: ['customers', 'customer', editor],
     enabled: editor !== null && editor !== 'new',
@@ -195,7 +236,7 @@ export function Customers({ initialCustomer, onOpen, admin = false, startNew = f
     },
   })
 
-  if (editor === 'new') return <CustomerForm onClose={() => setEditor(null)}/>
+  if (editor === 'new') return <CustomerForm onClose={() => setEditor(null)} onOpenExisting={id => setEditor(id)}/>
   if (editor) {
     if (details.isError) return <ErrorState title="Falha ao consultar o cliente" description="O cliente pode não existir ou não estar disponível para o seu perfil."
       onRetry={() => void details.refetch()}/>
@@ -231,7 +272,15 @@ export function Customers({ initialCustomer, onOpen, admin = false, startNew = f
         <option value="">Todas as UFs</option>{states.map(state => <option key={state}>{state}</option>)}
       </select>
     </FilterBar>
+    {/* Exportar fica para Vendas e Administração; inativar e reativar em massa, só Administração. */}
+    <BulkActions entity="CLIENTE" canChange={admin} filename="clientes.csv" onClear={selection.clear}
+      onDone={() => void lifecycleCache.invalidateQueries({ queryKey: ['customers'] })}
+      rows={selection.rows.map(row => ({ id: row.id, label: row.legal_name, active: row.active, cells: {
+        'Código': row.customer_number, 'Nome ou razão social': row.legal_name, 'Nome fantasia': row.trade_name ?? '',
+        'CPF/CNPJ': row.document ?? '', Cidade: row.city ?? '', UF: row.uf ?? '', Pagamento: row.payment_terms ?? '',
+        'Situação': row.active ? 'Ativo' : 'Inativo' } }))}/>
     <DataTable caption="Clientes" rows={list.data?.data} columns={columns} rowKey={row => row.id}
+      selection={{ selected: selection.selected, onChange: selection.onChange, rowLabel: row => row.legal_name }}
       loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
       total={list.data?.count ?? 0} page={filters.page} pageSize={filters.pageSize}
       onPageChange={page => setFilters(current => ({ ...current, page }))} onPageSizeChange={pageSize => update({ pageSize })}
