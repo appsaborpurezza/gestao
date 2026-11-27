@@ -204,11 +204,11 @@ function ConfirmDraft({ draft }: { draft: Draft }) {
   </section>
 }
 
-export function Orders({ canRegisterBilling }: { canRegisterBilling: boolean }) {
+export function Orders({ canRegisterBilling, initialOrder }: { canRegisterBilling: boolean; initialOrder?: string }) {
   const [creating, setCreating] = useState(false)
   const [configuringDocument, setConfiguringDocument] = useState(false)
   const [editing, setEditing] = useState<Draft | undefined>()
-  const [selected, setSelected] = useState('')
+  const [selected, setSelected] = useState(initialOrder ?? '')
   const [page, setPage] = useState(0)
   const orders = useQuery({
     queryKey: ['orders', 'list', page],

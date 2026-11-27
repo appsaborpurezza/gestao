@@ -92,8 +92,8 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   </section>
 }
 
-export function Customers() {
-  const [editor, setEditor] = useState<string | null>(null)
+export function Customers({ initialCustomer }: { initialCustomer?: string }) {
+  const [editor, setEditor] = useState<string | null>(initialCustomer ?? null)
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const list = useQuery({
