@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 
+let channelSeq = 0
+
 export function useBoardRealtime() {
   const cache = useQueryClient()
   const [connected, setConnected] = useState(false)
@@ -25,7 +27,7 @@ export function useBoardRealtime() {
       if (!document.hidden && dirty) reconcile()
     }
     document.addEventListener('visibilitychange', onVisibility)
-    const channel = supabase.channel('production-board-revision')
+    const channel = supabase.channel('production-board-revision-' + ++channelSeq)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'production_board_revision' }, reconcile)
       .subscribe(status => {
         if (!active) return

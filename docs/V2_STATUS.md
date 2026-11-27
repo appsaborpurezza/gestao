@@ -22,10 +22,10 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 10. Formulários | PUBLICADO | `ui/Combobox.tsx`, `Customers.tsx`, `Orders.tsx`, `Inventory.tsx` | — | Validações SQL V1 | Combobox, seções, aviso de não salvo em Clientes; painéis de detalhe com formulários em Expedição, Cadastros e Perdas | Aviso de não salvo nos demais formulários |
 | 11. Dashboard executivo | PUBLICADO | `Dashboard.tsx`, `trend.ts` | V1 041 | `trend.test.ts`, Pareto, séries, exportações | Cards com tendência contra o período anterior e atalhos de detalhamento | Indicadores novos (ex.: produtividade por etapa) |
 | 12. Painéis departamentais | IMPLEMENTADO | `Dashboard.tsx` | V1 041 | Build | Abas Produção, Qualidade e estoque, Comercial | Indicadores específicos por departamento |
-| 13. Kanban | PUBLICADO | `ProductionBoard.tsx`, `boardState.ts` | V2 001–003 | `boardState.test.ts`, RLS | Cards compactos, cor por etapa, prazo, painel lateral, lista em DataTable | Visão por OP, arrastar com formulário |
+| 13. Kanban | EM HOMOLOGAÇÃO | `ProductionBoard.tsx`, `boardQuery.ts` | V2 001–003, 01200 | `boardState.test.ts`, `productionBoardQuery.test.ts`, 60 verificações visuais em 5 resoluções | Cards compactos, cor por etapa, prazo, painel lateral, lista em DataTable; indicadores calculados no servidor e clicáveis; kg por coluna e por cartão; filtros combináveis (situação, prazo, entrega de/até, OP, busca); ordenação; visualizações salvas; aba Por OP com progresso do lote | Aplicar a migration 01200 em homologação e produção. Arrastar e soltar não se aplica (ver nota abaixo) |
 | 14. Realtime | PUBLICADO | `useBoardRealtime.ts` | V2 002–003 | SQL homologação | Canal único, pausa em aba oculta | Teste entre dois dispositivos |
-| 15. Modo TV | PUBLICADO | `ProductionBoard.tsx` | V2 001–003 | Build | Gestão à vista | Indicadores e relógio |
-| 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx` | V1 029–039 | Capturas em tablet | Sidebar compacta, uma etapa por vez no celular | Terminal por estação, E2E em tablet |
+| 15. Modo TV | EM HOMOLOGAÇÃO | `TvBoard.tsx` | V2 001–003, 01200 | Verificação visual sem nomes de clientes | Totais do servidor (massadas e kg em produção, finalizadas hoje, atrasadas, pausadas ou bloqueadas) e kg por etapa; sem valores comerciais | — |
+| 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx` | V1 029–039 | Capturas em tablet | Sidebar compacta, uma etapa por vez no celular | E2E em tablet. Terminal por estação com fila paginada de 30 em 30 e "Carregar mais" (01200) |
 | 17. Estoque V2 | PUBLICADO | `features/inventory` | V1 003–010, 019, 034, 040 | `lotStatus.test.ts`, exportação | Lotes com filtros de situação e validade, ficha do lote pela URL, recebimento em seções, FEFO, posição por data, sessões de inventário com revisão por linha | — |
 | 18. Pedidos V2 | PUBLICADO | `features/orders` | V1 012–023, 034; V2 008 | `uiHelpers.test.ts`, PDF | Lista com filtros, prazo, busca sem acento, Combobox; Expedição no novo padrão | — |
 | 19. Receitas V2 | PUBLICADO | `RecipeList.tsx`, `RecipeReview.tsx` | V1 025–028, 033 | Build | Lista com busca por ingrediente e situação | Criação de receita nova pela interface |
@@ -44,6 +44,13 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | PWA (complementar) | PUBLICADO | `public/manifest.webmanifest` | — | Build | Manifesto com ícones e cor da marca | Service worker (fora do escopo) |
 
 V1 001–041 refere-se à série `2026112400xxx`. V2 001–008 refere-se à série `20261127000x00`. Nomes exatos e ordenação estão em [supabase/migrations](../supabase/migrations).
+
+## Kanban v2 (Etapa 2)
+
+- `production_board_query(page_size, page_offsets, filters, sort)` substitui a leitura do quadro no frontend. Calcula no servidor os indicadores, os totais em kg, os grupos por OP e a paginação de cada coluna. `production_board_columns` continua disponível e não foi alterada.
+- O Realtime continua invalidando o prefixo `['production-board','columns']`. Cada tela abre seu próprio canal, o que corrigiu a falha do terminal ao usar duas consultas na mesma página.
+- A rastreabilidade individual não muda: cada cartão continua sendo uma massada, com o mesmo painel lateral e os mesmos registros.
+- Arrastar e soltar: não se aplica. Cada mudança de etapa exige registros obrigatórios (checklist, medições, embalagem, lote), que só o formulário da etapa coleta. Arrastar um cartão daria a impressão de que a etapa foi concluída sem esses registros. A ação continua pelo botão da etapa no painel lateral e no terminal.
 
 ## Implantação e recuperação
 
