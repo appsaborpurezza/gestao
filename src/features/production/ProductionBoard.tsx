@@ -7,6 +7,13 @@ import { BatchPackaging } from './BatchPackaging'
 import { formatStageDuration, StagePauseControl, StageTiming } from './StageTiming'
 import { MassLossForm, type LossOperation } from './Losses'
 import { useBoardRealtime } from './useBoardRealtime'
+import { CalendarClock, Factory, Monitor, PackageCheck, Timer } from 'lucide-react'
+import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+import { Tabs } from '../../ui/Tabs'
+import { FilterBar, SearchInput } from '../../ui/filters'
+import { DataTable, type Column } from '../../ui/DataTable'
+import { todayInSaoPaulo } from '../../lib/periods'
+import { batchDeadline, stateTones } from './boardState'
 
 const columns = [
   ['PLANEJADA', 'Pedidos'],
@@ -33,8 +40,8 @@ type Batch = {
   stage_status: 'EM_EXECUCAO' | 'PAUSADA' | null; stage_net_seconds: number
   order_number: number; customer_name: string; description: string; delivery_date: string
 }
-const stateLabels = { blocked: 'Bloqueada', paused: 'Pausada', done: 'Finalizada', running: 'Em execução', waiting: 'Aguardando' }
-function batchState(batch: Batch) {
+export const stateLabels = { blocked: 'Bloqueada', paused: 'Pausada', done: 'Finalizada', running: 'Em execução', waiting: 'Aguardando' }
+export function batchState(batch: Pick<Batch, 'recalled' | 'stage_status' | 'status'>) {
   if (batch.recalled) return 'blocked'
   if (batch.stage_status === 'PAUSADA') return 'paused'
   if (batch.status === 'FINALIZADA') return 'done'
@@ -117,6 +124,26 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   </article>
 }
 
+function BatchSummary({ batch, today, onOpen, disabled }: { batch: Batch; today: string; onOpen: () => void; disabled?: boolean }) {
+  const state = batchState(batch)
+  const deadline = batchDeadline(batch, today)
+  return <button type="button" className="kanban-card" data-state={state} aria-haspopup="dialog" disabled={disabled} onClick={onOpen}>
+    <span className="kanban-card-top">
+      <strong>OP {batch.production_number} · {batch.sequence}/{batch.batches_count}</strong>
+      <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>
+    </span>
+    <span className="kanban-card-product">{batch.description}</span>
+    <span className="kanban-card-meta">Pedido {batch.order_number} · {batch.customer_name}</span>
+    <span className="kanban-card-foot">
+      <span><CalendarClock aria-hidden="true" size={14}/>{batch.delivery_date.split('-').reverse().join('/')}</span>
+      {deadline === 'late' && <Badge tone="danger">Atrasada</Badge>}
+      {deadline === 'soon' && <Badge tone="warning">Entrega próxima</Badge>}
+      {batch.stage_status && <span><Timer aria-hidden="true" size={14}/>{formatStageDuration(batch.stage_net_seconds)}</span>}
+      {(batch.output_code ?? batch.lot_code) && <span className="ui-code"><PackageCheck aria-hidden="true" size={14}/>{batch.output_code ?? batch.lot_code}</span>}
+    </span>
+  </button>
+}
+
 export function ProductionBoard({ canStart }: { canStart: boolean }) {
   const realtime = useBoardRealtime()
   const [offsets, setOffsets] = useState<Partial<Record<Stage, number>>>({})
@@ -165,68 +192,70 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
     </nav>
   }
 
+  const today = todayInSaoPaulo()
+  const openBatch = (id: string) => { setSelectedBatch(id); details.current?.showModal() }
+  const currentTitle = columns.find(([key]) => key === column)?.[1] ?? 'etapa'
+  const listColumns: Column<Batch>[] = [
+    { id: 'op', header: 'OP e massada', cell: batch => <strong>OP {batch.production_number} · {batch.sequence}/{batch.batches_count}</strong> },
+    { id: 'order', header: 'Pedido e cliente', cell: batch => <span className="ui-cell-stack"><span>Pedido {batch.order_number}</span><small>{batch.customer_name}</small></span> },
+    { id: 'product', header: 'Produto', cell: batch => batch.description },
+    { id: 'lot', header: 'Lote', optional: true, cell: batch => <span className="ui-code">{batch.output_code ?? batch.lot_code ?? 'A gerar'}</span> },
+    { id: 'delivery', header: 'Entrega', cell: batch => {
+      const deadline = batchDeadline(batch, today)
+      return <span className="ui-cell-stack"><span>{batch.delivery_date.split('-').reverse().join('/')}</span>
+        {deadline === 'late' && <Badge tone="danger">Atrasada</Badge>}{deadline === 'soon' && <Badge tone="warning">Entrega próxima</Badge>}</span>
+    } },
+    { id: 'state', header: 'Situação', cell: batch => <Badge tone={stateTones[batchState(batch)]}>{stateLabels[batchState(batch)]}</Badge> },
+  ]
+
   return <section className="panel">
-    <h1>Quadro de produção</h1>
-    <p role="status">{realtime ? 'Atualização em tempo real' : 'Atualização periódica'}
-      {board.dataUpdatedAt > 0 && ' · Última consulta ' + dateTime.format(board.dataUpdatedAt)}</p>
-    <div className="customer-fields">
-      <label>Visualização
-        <select value={view} onChange={event => setView(event.target.value as 'board' | 'list')}>
-          <option value="board">Quadro por etapa</option>
-          <option value="list">Lista da etapa</option>
-        </select>
-      </label>
-      <label>Buscar massadas
-        <input type="search" maxLength={100} value={input} onChange={event => setInput(event.target.value)}
-          placeholder="OP, pedido, cliente, produto ou lote"/>
-      </label>
-      <div className="customer-actions">
-        <button type="button" className="secondary" disabled={!input && !Object.keys(offsets).length}
-          onClick={() => { setInput(''); setSearch(''); setOffsets({}) }}>Limpar filtros</button>
-        <button type="button" className="secondary" disabled={board.isFetching}
-          onClick={() => void board.refetch()}>Atualizar quadro</button>
-        {canStart && <button type="button" className="secondary" disabled={!board.data}
-          aria-haspopup="dialog" onClick={() => tv.current?.showModal()}>Gestão à vista</button>}
-      </div>
-    </div>
-    {board.isPending && <p role="status">Carregando massadas…</p>}
-    {board.isError && <p role="alert">Falha ao consultar o quadro de produção. Use Atualizar quadro para tentar novamente.</p>}
-    {board.data && <>
-      <label className={view === 'board' ? 'board-stage-filter' : 'board-list-filter'}>Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
+    <PageHeader icon={Factory} title="Kanban de produção"
+      description={<>{realtime ? 'Atualização em tempo real' : 'Atualização periódica'}
+        {board.dataUpdatedAt > 0 && ' · Última consulta ' + dateTime.format(board.dataUpdatedAt)}</>}
+      actions={canStart && <button type="button" className="secondary" disabled={!board.data}
+        aria-haspopup="dialog" onClick={() => tv.current?.showModal()}><Monitor aria-hidden="true" size={16}/>Gestão à vista</button>}/>
+    <Tabs label="Visualização" value={view} onChange={setView} items={[
+      { id: 'board', label: 'Quadro por etapa' }, { id: 'list', label: 'Lista da etapa' },
+    ]}/>
+    <FilterBar activeCount={search ? 1 : 0} onClear={() => { setInput(''); setSearch(''); setOffsets({}) }}
+      onRefresh={() => void board.refetch()} refreshing={board.isFetching}>
+      <SearchInput label="Buscar por OP, pedido, cliente, produto ou lote" value={input} onChange={setInput}/>
+      <label className={view === 'board' ? 'board-stage-filter' : undefined}>Etapa <select value={column} onChange={event => setColumn(event.target.value as Stage)}>
         {columns.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
       </select></label>
-      {view === 'board' ? <div className="production-board" aria-busy={board.isPlaceholderData}>
+    </FilterBar>
+    {board.isPending && <Skeleton lines={6} label="Carregando massadas…"/>}
+    {board.isError && <ErrorState title="Falha ao consultar o quadro de produção" onRetry={() => void board.refetch()}/>}
+    {board.data && (view === 'board' ? <div className="kanban" aria-busy={board.isPlaceholderData}>
         {columns.map(([key, title]) => {
           const { total, rows } = board.data[key]
-          return <section key={key} className="board-stage" data-selected={column === key}>
-            <h2>{title} <span className="board-count">{total}</span></h2>
-            {rows.length === 0 && <p>{total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
-            {rows.map(batch => <BatchCard key={batch.id} batch={batch} canStart={canStart}/>)}
+          return <section key={key} className="kanban-column" data-stage={key} data-selected={column === key} aria-labelledby={'stage-' + key}>
+            <div className="kanban-column-header">
+              <h2 id={'stage-' + key}>{title}</h2>
+              <span className="kanban-count" aria-label={`${total} ${total === 1 ? 'massada' : 'massadas'}`}>{total}</span>
+            </div>
+            <div className="kanban-column-body">
+              {rows.length === 0 && <p className="kanban-empty">{total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
+              {rows.map(batch => <BatchSummary key={batch.id} batch={batch} today={today}
+                disabled={board.isPlaceholderData} onOpen={() => openBatch(batch.id)}/>)}
+            </div>
             {pagination(key, title, total)}
           </section>
         })}
       </div> : <section aria-busy={board.isPlaceholderData}>
-        <h2>{columns.find(([key]) => key === column)?.[1]} <span className="board-count">{board.data[column].total}</span></h2>
-        {board.data[column].rows.length ? <div className="table-scroll"><table>
-          <thead><tr><th>OP e massada</th><th>Pedido e cliente</th><th>Produto</th><th>Lote</th><th>Entrega</th><th>Situação</th><th>Ação</th></tr></thead>
-          <tbody>{board.data[column].rows.map(batch => <tr key={batch.id}>
-            <th scope="row">OP {batch.production_number} · {batch.sequence}/{batch.batches_count}</th>
-            <td>{batch.order_number} · {batch.customer_name}</td><td>{batch.description}</td>
-            <td>{batch.output_code ?? batch.lot_code ?? 'A gerar'}</td>
-            <td>{batch.delivery_date.split('-').reverse().join('/')}</td>
-            <td>{stateLabels[batchState(batch)]}</td>
-            <td><button type="button" className="secondary" aria-haspopup="dialog" disabled={board.isPlaceholderData}
-              onClick={() => { setSelectedBatch(batch.id); details.current?.showModal() }}>
-              Abrir <span className="sr-only">OP {batch.production_number}, massada {batch.sequence}</span>
-            </button></td>
-          </tr>)}</tbody>
-        </table></div> : <p>{board.data[column].total ? 'Esta página está vazia.' : 'Nenhuma massada nesta etapa.'}</p>}
-        {pagination(column, columns.find(([key]) => key === column)?.[1] ?? 'etapa', board.data[column].total)}
-      </section>}
-    </>}
+        <DataTable caption={currentTitle} rows={board.data[column].rows} columns={listColumns} rowKey={batch => batch.id}
+          preferenceKey="production-list" onRowOpen={batch => openBatch(batch.id)}
+          filtered={!!search} onClearFilters={() => { setInput(''); setSearch(''); setOffsets({}) }}
+          empty={{ title: board.data[column].total ? 'Esta página está vazia' : 'Nenhuma massada nesta etapa' }}
+          rowActions={batch => <button type="button" className="secondary" aria-haspopup="dialog" disabled={board.isPlaceholderData}
+            onClick={() => openBatch(batch.id)}>Abrir <span className="sr-only">OP {batch.production_number}, massada {batch.sequence}</span></button>}/>
+        {pagination(column, currentTitle, board.data[column].total)}
+      </section>)}
     <dialog className="board-detail-drawer" ref={details} aria-labelledby="board-detail-title" onClose={() => setSelectedBatch(null)}>
-      <h2 id="board-detail-title">Detalhes da massada</h2>
-      <button type="button" className="secondary" onClick={() => details.current?.close()}>Fechar detalhes</button>
+      <div className="ui-detail-header">
+        <h2 id="board-detail-title">Detalhes da massada</h2>
+        <button type="button" className="secondary" onClick={() => details.current?.close()}>Fechar detalhes</button>
+      </div>
       {selected ? <BatchCard key={selected.id} batch={selected} canStart={canStart}/>
         : selectedBatch && <p role="status">A massada saiu da página consultada. Feche os detalhes para voltar ao quadro.</p>}
     </dialog>

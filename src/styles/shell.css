@@ -618,3 +618,41 @@ th[aria-sort] .ui-sort { color: var(--color-primary); }
 .ui-combobox > label { display: block; }
 .lot-decision { border-top: 1px solid var(--color-border); padding-top: var(--space-3); margin-top: var(--space-2); }
 .ui-cell-stack .ui-code, .ui-detail .ui-code { overflow-wrap: anywhere; }
+
+/* Kanban de produção */
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: var(--space-3); overflow-x: auto; padding-bottom: var(--space-2); scroll-snap-type: x proximity; }
+.kanban-column { --stage: var(--color-brand-blue); display: flex; flex-direction: column; min-height: 320px; background: var(--color-surface-muted); border: 1px solid var(--color-border); border-top: 4px solid var(--stage); border-radius: var(--radius-lg); scroll-snap-align: start; }
+.kanban-column[data-stage=PLANEJADA] { --stage: var(--color-neutral-ink); }
+.kanban-column[data-stage=EM_PREPARACAO] { --stage: var(--color-info); }
+.kanban-column[data-stage=EM_BATER_MASSA] { --stage: var(--color-warning); }
+.kanban-column[data-stage=EM_CILINDROS] { --stage: var(--color-brand-blue); }
+.kanban-column[data-stage=EM_EMBALAGEM] { --stage: var(--color-brand-navy); }
+.kanban-column[data-stage=FINALIZADA] { --stage: var(--color-success); }
+.kanban-column-header { position: sticky; top: 0; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); padding: var(--space-3); background: inherit; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.kanban-column-header h2 { margin: 0; font-size: var(--text-sm); line-height: 1.3; color: var(--color-text-primary); text-transform: uppercase; letter-spacing: .02em; }
+.kanban-count { min-width: 1.75rem; text-align: center; padding: 2px var(--space-2); border-radius: var(--radius-pill); background: var(--color-surface); border: 1px solid var(--color-border); font-weight: 700; font-size: var(--text-sm); }
+.kanban-column-body { display: grid; gap: var(--space-2); align-content: start; padding: 0 var(--space-3) var(--space-3); flex: 1; }
+.kanban-column nav { padding: 0 var(--space-3) var(--space-3); display: flex; gap: var(--space-2); align-items: center; justify-content: space-between; }
+.kanban-empty { margin: 0; padding: var(--space-4) var(--space-2); text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-md); }
+.kanban-card, .kanban-card:hover { all: unset; box-sizing: border-box; display: grid; gap: 6px; padding: var(--space-3); background: var(--color-surface); color: var(--color-text-primary); border: 1px solid var(--color-border); border-inline-start: 4px solid var(--card-edge, var(--color-border-strong)); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); cursor: pointer; text-align: start; font: inherit; transition: box-shadow .15s, transform .15s; }
+.kanban-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.kanban-card:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.kanban-card:disabled { opacity: .6; cursor: progress; }
+.kanban-card[data-state=blocked] { --card-edge: var(--color-danger); }
+.kanban-card[data-state=paused] { --card-edge: var(--color-neutral-ink); }
+.kanban-card[data-state=running] { --card-edge: var(--color-warning); }
+.kanban-card[data-state=done] { --card-edge: var(--color-success); }
+.kanban-card[data-state=waiting] { --card-edge: var(--color-info); }
+.kanban-card-top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.kanban-card-product { font-weight: 600; line-height: 1.3; }
+.kanban-card-meta { color: var(--color-text-muted); font-size: var(--text-sm); }
+.kanban-card-foot { display: flex; flex-wrap: wrap; gap: 4px var(--space-3); align-items: center; font-size: var(--text-xs); color: var(--color-text-muted); }
+.kanban-card-foot > span { display: inline-flex; align-items: center; gap: 4px; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .kanban-card, .kanban-card:hover { transition: none; transform: none; } }
+@media (max-width: 700px) {
+  .kanban { display: block; }
+  .kanban-column[data-selected=false] { display: none; }
+}
+@media (min-width: 701px) { .board-stage-filter { display: none; } }
+.kanban-card-top strong { white-space: nowrap; }
+.kanban-card-top { flex-wrap: wrap; }
