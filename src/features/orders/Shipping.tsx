@@ -14,8 +14,8 @@ type QueueRow = {
 }
 const brDate = (value: string) => value.split('-').reverse().join('/')
 
-export function Shipping({ allowOperations }: { allowOperations: boolean }) {
-  const [view, setView] = useState<'queue' | 'history'>(allowOperations ? 'queue' : 'history')
+export function Shipping({ allowOperations, focusShipment }: { allowOperations: boolean; focusShipment?: string }) {
+  const [view, setView] = useState<'queue' | 'history'>(allowOperations && !focusShipment ? 'queue' : 'history')
   const cache = useQueryClient()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(25)
@@ -92,7 +92,7 @@ export function Shipping({ allowOperations }: { allowOperations: boolean }) {
     {allowOperations && <Tabs label="Expedição" value={view} onChange={next => { setView(next); setFeedback(null) }} items={[
       { id: 'queue', label: 'Fila de despacho' }, { id: 'history', label: 'Histórico' },
     ]}/>}
-    {!operating ? <ShipmentHistory allowConfirmation={allowOperations}/> : <>
+    {!operating ? <ShipmentHistory allowConfirmation={allowOperations} focus={focusShipment}/> : <>
     {feedback && <p className="ui-message" data-tone={feedback.error ? 'danger' : 'success'} role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
     {current && <article className="ui-detail" aria-labelledby="dispatch-title">
       <div className="ui-detail-header">

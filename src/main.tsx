@@ -38,6 +38,7 @@ const ProductionBoard = lazy(() => import('./features/production/ProductionBoard
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const OperationalAlerts = lazy(() => import('./features/alerts/OperationalAlerts'))
 const ReportCenter = lazy(() => import('./features/reports/ReportCenter'))
+const ActivityTimeline = lazy(() => import('./features/activity/ActivityTimeline'))
 const DepartmentPanels = lazy(() => import('./features/panels/DepartmentPanels'))
 const ProfileManagement = lazy(() => import('./features/administration/ProfileManagement'))
 
@@ -98,7 +99,7 @@ function Workspace({ userId }: { userId: string }) {
     enabled: !!profile.data && profile.data.role !== 'VENDAS' && tab === 'recipes',
     queryFn: async () => {
       const request = supabase.from('recipes')
-        .select('id,code,name,recipe_versions(id,version,status,yield_min,yield_target,yield_max,recipe_ingredients(id,ordinal,source_name,quantity,unit))')
+        .select('id,code,name,discontinued_at,discontinued_reason,recipe_versions(id,version,status,yield_min,yield_target,yield_max,recipe_ingredients(id,ordinal,source_name,quantity,unit))')
         .order('code')
       if (target?.module === 'recipes') request.eq('id', target.record_id)
       const { data, error } = await request
@@ -130,6 +131,9 @@ function Workspace({ userId }: { userId: string }) {
           quickActions={role && <><Onboarding role={role}/><QuickActions role={role} onAction={runQuick}/></>}/></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
+        </Suspense>}
+        {tab === 'activity' && role === 'ADMINISTRADOR' && <Suspense fallback={<p role="status">Abrindo linha do tempo…</p>}>
+          <ActivityTimeline/>
         </Suspense>}
         {tab === 'panels' && role && <Suspense fallback={<p role="status">Abrindo painéis…</p>}>
           <DepartmentPanels key={`${userId}:${role}`} accessKey={`${userId}:${role}`} onNavigate={setTab}/>
@@ -181,7 +185,8 @@ function Workspace({ userId }: { userId: string }) {
           <ProductionDemand/>
         </Suspense>}
         {tab === 'shipping' && <Suspense fallback={<p role="status">Abrindo expedição…</p>}>
-          <Shipping allowOperations={role !== 'VENDAS'}/>
+          <Shipping key={target?.module === 'shipping' ? target.record_id : 'shipping'} allowOperations={role !== 'VENDAS'}
+            focusShipment={target?.module === 'shipping' ? target.record_id : undefined}/>
         </Suspense>}
         {tab === 'terminal' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo terminal…</p>}>
           <StationTerminal canOperate/>
@@ -190,7 +195,8 @@ function Workspace({ userId }: { userId: string }) {
           <TvBoard onExit={() => setTab('production-board')}/>
         </Suspense>}
         {tab === 'production-board' && <Suspense fallback={<p role="status">Abrindo quadro…</p>}>
-          <ProductionBoard canStart={role !== 'VENDAS'}/>
+          <ProductionBoard key={target?.module === 'production-board' ? target.record_id : 'board'} canStart={role !== 'VENDAS'}
+            focus={target?.module === 'production-board' ? target.reference : undefined}/>
         </Suspense>}
         {tab === 'traceability' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo rastreabilidade…</p>}>
           <Traceability key={target?.module === 'traceability' ? target.record_id : 'traceability'}

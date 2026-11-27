@@ -187,7 +187,7 @@ function OrderGroups({ groups, onOpen }: { groups: BoardGroup[]; onOpen: (produc
   </ul>
 }
 
-export function ProductionBoard({ canStart }: { canStart: boolean }) {
+export function ProductionBoard({ canStart, focus }: { canStart: boolean; focus?: string }) {
   const [offsets, setOffsets] = useState<Partial<Record<Stage, number>>>({})
   const [column, setColumn] = useState<Stage>('PLANEJADA')
   const [stored, setStored] = useSessionState<BoardView>('production-board', defaultView)
@@ -203,6 +203,12 @@ export function ProductionBoard({ canStart }: { canStart: boolean }) {
   const patch = (filters: Partial<BoardFilters>) => apply({ ...view, filters: { ...view.filters, ...filters } })
   const search = useDebouncedValue(input.trim(), 300)
   useEffect(() => { if (search !== view.filters.search) { setStored(current => ({ ...current, filters: { ...emptyBoardFilters, ...current.filters, search } })); setOffsets({}) } }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Vindo da busca global: "OP 123" filtra pela OP; código de massada vai para a busca.
+  useEffect(() => {
+    if (!focus) return
+    const op = /^OP (\d+)$/.exec(focus)
+    apply({ ...view, filters: { ...emptyBoardFilters, ...(op ? { production_number: op[1]! } : { search: focus }) } })
+  }, [focus]) // eslint-disable-line react-hooks/exhaustive-deps
   const { board, realtime } = useBoardQuery(pageSize, offsets, view.filters, view.sort)
   const pages = board.data?.columns
   const summary = board.data?.summary

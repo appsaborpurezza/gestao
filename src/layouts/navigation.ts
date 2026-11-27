@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, BarChart3, LayoutDashboard, Boxes, ClipboardList, Factory, FileBarChart, FlaskConical, Gauge, Link2, PackageSearch,
+  AlertTriangle, BarChart3, History, LayoutDashboard, Boxes, ClipboardList, Factory, FileBarChart, FlaskConical, Gauge, Link2, PackageSearch,
   Recycle, Settings2, ShieldAlert, ShoppingCart, Tablet, Tags, Truck, Tv, Upload, UserCog, Users, Workflow, type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +47,7 @@ export const departments: Department[] = [
   { label: 'Administração', entries: [
     { id: 'profiles', title: 'Usuários e permissões', icon: UserCog },
     { id: 'import', title: 'Importação', icon: Upload },
+    { id: 'activity', title: 'Linha do tempo', icon: History },
   ] },
 ]
 
@@ -55,7 +56,7 @@ export const settingsIcon = Settings2
 
 const operational = new Set(['terminal', 'tv', 'production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
 const commercial = new Set(['orders', 'customers'])
-const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import', 'profiles'])
+const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import', 'profiles', 'activity'])
 const shared = new Set(['dashboard', 'alerts', 'panels', 'reports', 'products', 'production-board', 'shipping'])
 
 /** Espelha as regras de acesso do servidor; o banco continua sendo a autoridade (RLS e RPCs). */

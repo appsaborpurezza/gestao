@@ -9,9 +9,10 @@ import { groupProductionSeries, type Grouping, type ProductionDay } from './prod
 import { dashboardPreferences } from './dashboardPreferences'
 import { dashboardPeriod, dashboardPresets } from './dashboardPeriods'
 import { previousPeriod, trend, type Trend } from './trend'
-import { AlertTriangle, BadgeCheck, CalendarX, ClipboardList, Factory, FileSpreadsheet, FileText, Gauge, Receipt, Scale, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, CalendarX, ClipboardList, Factory, FileSpreadsheet, FileText, Gauge, Receipt, Scale, SlidersHorizontal, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { ErrorState, PageHeader, Skeleton, StatCard } from '../../ui'
 import { Tabs } from '../../ui/Tabs'
+import { Modal } from '../../ui/records'
 
 type Operations = {
   finished_count: number
@@ -80,6 +81,11 @@ export default function Dashboard({ accessKey, onNavigate, quickActions }: { acc
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
+  // Personalização da Visão geral: indicadores ocultos, lembrados neste navegador para este usuário.
+  const layoutKey = 'purezza:overview-layout:' + accessKey
+  const [hidden, setHidden] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(layoutKey) ?? '[]') as string[] } catch { return [] } })
+  const [customizing, setCustomizing] = useState(false)
+  useEffect(() => { try { localStorage.setItem(layoutKey, JSON.stringify(hidden)) } catch { /* indisponível */ } }, [hidden, layoutKey])
   const report = useQuery({
     queryKey: ['role-dashboard', accessKey, period],
     queryFn: async ({ signal }) => {
@@ -132,6 +138,42 @@ export default function Dashboard({ accessKey, onNavigate, quickActions }: { acc
     ['Registros de faturamento emitidos', commercial.billing_count],
     ['Valor emitido', commercial.billed_amount === null ? 'N/D' : formatBrl(commercial.billed_amount)],
   ] : []
+  const cards: { id: string; label: string; visible: boolean; node: React.ReactNode }[] = [
+    { id: 'finished', label: 'Massadas finalizadas', visible: !!operations && show('production'), node: operations &&
+      <StatCard icon={Factory} label="Massadas finalizadas" value={operations.finished_count}
+        context={<TrendNote value={trend(operations.finished_count, prevOps?.finished_count)} better="up"/>}
+        onOpen={onNavigate && (() => onNavigate('production-board'))}/> },
+    { id: 'measured', label: 'Peso medido', visible: !!operations && show('production'), node: operations &&
+      <StatCard icon={Scale} label="Peso medido" value={operations.measured_kg === null ? 'N/D' : formatStockQuantity(operations.measured_kg)}
+        unit={operations.measured_kg === null ? undefined : 'kg'}
+        context={<TrendNote value={trend(operations.measured_kg, prevOps?.measured_kg)} better="up"/>}/> },
+    { id: 'loss', label: 'Perdas sobre a produção', visible: !!operations && show('production'), node: operations &&
+      <StatCard icon={AlertTriangle} label="Perdas sobre a produção" value={percent(operations.linked_loss_pct)}
+        tone={operations.linked_loss_pct !== null && Number(operations.linked_loss_pct) > 3 ? 'warning' : 'neutral'}
+        context={<TrendNote value={trend(operations.linked_loss_pct, prevOps?.linked_loss_pct, 'points')} better="down"/>}
+        onOpen={onNavigate && (() => onNavigate('losses'))}/> },
+    { id: 'expired', label: 'Lotes vencidos ou vencendo hoje', visible: !!operations && show('quality'), node: operations &&
+      <StatCard icon={CalendarX} label="Lotes vencidos ou vencendo hoje" value={operations.expired_lots}
+        tone={operations.expired_lots > 0 ? 'danger' : 'success'} context="Saldo atual"
+        onOpen={onNavigate && (() => onNavigate('inventory'))}/> },
+    { id: 'expiring', label: 'Liberados vencendo em 7 dias', visible: !!operations && show('quality'), node: operations &&
+      <StatCard icon={CalendarX} label="Liberados vencendo em 7 dias" value={operations.expiring_released_lots}
+        tone={operations.expiring_released_lots > 0 ? 'warning' : 'success'} context="Saldo atual"
+        onOpen={onNavigate && (() => onNavigate('inventory'))}/> },
+    { id: 'open-orders', label: 'Pedidos em aberto', visible: !!commercial && show('commercial'), node: commercial &&
+      <StatCard icon={ClipboardList} label="Pedidos em aberto" value={commercial.open_orders} context="Situação atual"
+        onOpen={onNavigate && (() => onNavigate('orders'))}/> },
+    { id: 'overdue', label: 'Pedidos atrasados', visible: !!commercial && show('commercial'), node: commercial &&
+      <StatCard icon={AlertTriangle} label="Pedidos atrasados" value={commercial.overdue_orders}
+        tone={commercial.overdue_orders > 0 ? 'danger' : 'success'} context="Situação atual"
+        onOpen={onNavigate && (() => onNavigate('orders'))}/> },
+    { id: 'otif', label: 'OTIF', visible: !!commercial && show('commercial'), node: commercial &&
+      <StatCard icon={BadgeCheck} label="OTIF (completo e no prazo)" value={percent(commercial.otif_pct)}
+        context={<TrendNote value={trend(commercial.otif_pct, prevCom?.otif_pct, 'points')} better="up"/>}/> },
+    { id: 'billed', label: 'Valor faturado', visible: !!commercial && show('commercial'), node: commercial &&
+      <StatCard icon={Receipt} label="Valor faturado" value={commercial.billed_amount === null ? 'N/D' : formatBrl(commercial.billed_amount)}
+        context={<TrendNote value={trend(commercial.billed_amount, prevCom?.billed_amount)} better="up"/>}/> },
+  ]
   const series = seriesOptions[grouping]
   const seriesColumns = [series.column, ...seriesMeasures]
   const seriesRows = groupProductionSeries(operations?.daily ?? [], grouping).map(({ total, days }) => ({
@@ -200,7 +242,23 @@ export default function Dashboard({ accessKey, onNavigate, quickActions }: { acc
       actions={report.isSuccess && <>
         <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('pdf')}><FileText aria-hidden="true" size={16}/>Exportar PDF</button>
         <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('xlsx')}><FileSpreadsheet aria-hidden="true" size={16}/>Exportar Excel</button>
+        <button type="button" className="secondary" onClick={() => setCustomizing(true)}><SlidersHorizontal aria-hidden="true" size={16}/>Personalizar</button>
       </>}/>
+    <Modal open={customizing} title="Personalizar a Visão geral" onClose={() => setCustomizing(false)}>
+      <div className="ui-form">
+        <p className="ui-muted">Escolha os indicadores exibidos. A escolha fica salva neste navegador e não altera o que outras pessoas veem.</p>
+        <fieldset className="overview-cards"><legend className="sr-only">Indicadores</legend>
+          {cards.filter(card => card.node).map(card => <label key={card.id} className="ui-check">
+            <input type="checkbox" checked={!hidden.includes(card.id)}
+              onChange={event => setHidden(current => event.target.checked ? current.filter(id => id !== card.id) : [...current, card.id])}/> {card.label}
+          </label>)}
+        </fieldset>
+        <div className="ui-modal-actions">
+          <button type="button" className="secondary" onClick={() => setHidden([])}>Mostrar todos</button>
+          <button type="button" onClick={() => setCustomizing(false)}>Concluir</button>
+        </div>
+      </div>
+    </Modal>
     {quickActions}
     <div className="ui-filterbar" role="search">
       <div className="ui-filterbar-fields">
@@ -242,37 +300,7 @@ export default function Dashboard({ accessKey, onNavigate, quickActions }: { acc
         { id: 'commercial', label: 'Comercial', hidden: !commercial },
       ]}/>
       <div className="ui-stat-grid">
-        {operations && show('production') && <>
-          <StatCard icon={Factory} label="Massadas finalizadas" value={operations.finished_count}
-            context={<TrendNote value={trend(operations.finished_count, prevOps?.finished_count)} better="up"/>}
-            onOpen={onNavigate && (() => onNavigate('production-board'))}/>
-          <StatCard icon={Scale} label="Peso medido" value={operations.measured_kg === null ? 'N/D' : formatStockQuantity(operations.measured_kg)}
-            unit={operations.measured_kg === null ? undefined : 'kg'}
-            context={<TrendNote value={trend(operations.measured_kg, prevOps?.measured_kg)} better="up"/>}/>
-          <StatCard icon={AlertTriangle} label="Perdas sobre a produção" value={percent(operations.linked_loss_pct)}
-            tone={operations.linked_loss_pct !== null && Number(operations.linked_loss_pct) > 3 ? 'warning' : 'neutral'}
-            context={<TrendNote value={trend(operations.linked_loss_pct, prevOps?.linked_loss_pct, 'points')} better="down"/>}
-            onOpen={onNavigate && (() => onNavigate('losses'))}/>
-        </>}
-        {operations && show('quality') && <>
-          <StatCard icon={CalendarX} label="Lotes vencidos ou vencendo hoje" value={operations.expired_lots}
-            tone={operations.expired_lots > 0 ? 'danger' : 'success'} context="Saldo atual"
-            onOpen={onNavigate && (() => onNavigate('inventory'))}/>
-          <StatCard icon={CalendarX} label="Liberados vencendo em 7 dias" value={operations.expiring_released_lots}
-            tone={operations.expiring_released_lots > 0 ? 'warning' : 'success'} context="Saldo atual"
-            onOpen={onNavigate && (() => onNavigate('inventory'))}/>
-        </>}
-        {commercial && show('commercial') && <>
-          <StatCard icon={ClipboardList} label="Pedidos em aberto" value={commercial.open_orders} context="Situação atual"
-            onOpen={onNavigate && (() => onNavigate('orders'))}/>
-          <StatCard icon={AlertTriangle} label="Pedidos atrasados" value={commercial.overdue_orders}
-            tone={commercial.overdue_orders > 0 ? 'danger' : 'success'} context="Situação atual"
-            onOpen={onNavigate && (() => onNavigate('orders'))}/>
-          <StatCard icon={BadgeCheck} label="OTIF (completo e no prazo)" value={percent(commercial.otif_pct)}
-            context={<TrendNote value={trend(commercial.otif_pct, prevCom?.otif_pct, 'points')} better="up"/>}/>
-          <StatCard icon={Receipt} label="Valor faturado" value={commercial.billed_amount === null ? 'N/D' : formatBrl(commercial.billed_amount)}
-            context={<TrendNote value={trend(commercial.billed_amount, prevCom?.billed_amount)} better="up"/>}/>
-        </>}
+        {cards.filter(card => card.visible && !hidden.includes(card.id)).map(card => <Fragment key={card.id}>{card.node}</Fragment>)}
       </div>
     </>}
     {operations && (show('production') || show('quality')) && <section className="ui-detail">

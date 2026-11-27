@@ -9,7 +9,7 @@ function Marked({ text, term }: { text: string; term: string }) {
 
 const categories = [
   ['products', 'Produtos'], ['customers', 'Clientes'], ['orders', 'Pedidos'], ['recipes', 'Receitas'], ['traceability', 'Lotes'],
-  ['operational-catalog', 'Fornecedores e fabricantes'],
+  ['operational-catalog', 'Fornecedores e fabricantes'], ['production-board', 'OPs e massadas'], ['shipping', 'Expedições'],
 ] as const
 export type RecordMatch = { module: typeof categories[number][0]; record_id: string; label: string; reference: string }
 const pageSize = 16

@@ -31,6 +31,7 @@ export const historyLabels: Record<string, string> = {
   SALVAR_ASSOCIACAO_RECEITA: 'Associação de receita', SALVAR_REVISAO_RECEITA: 'Revisão técnica salva',
   APROVAR_RECEITA: 'Receita aprovada', CADASTRAR_OPCAO_PERDA: 'Cadastro de perda',
   CRIAR_RECEITA: 'Receita criada', NOVA_VERSAO_RECEITA: 'Nova versão criada', DUPLICAR_RECEITA: 'Receita duplicada',
+  EDITAR_CADASTRO: 'Editado', DESCONTINUAR_RECEITA: 'Receita descontinuada', REATIVAR_RECEITA: 'Receita reativada',
 }
 
 /** Mensagem segura para o operador: nunca expõe SQL cru. */
