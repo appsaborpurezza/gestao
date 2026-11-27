@@ -8,6 +8,10 @@ import { lossPareto } from './lossPareto'
 import { groupProductionSeries, type Grouping, type ProductionDay } from './productionSeries'
 import { dashboardPreferences } from './dashboardPreferences'
 import { dashboardPeriod, dashboardPresets } from './dashboardPeriods'
+import { previousPeriod, trend, type Trend } from './trend'
+import { AlertTriangle, BadgeCheck, CalendarX, ClipboardList, Factory, FileSpreadsheet, FileText, Gauge, Receipt, Scale, TrendingDown, TrendingUp, Minus } from 'lucide-react'
+import { ErrorState, PageHeader, Skeleton, StatCard } from '../../ui'
+import { Tabs } from '../../ui/Tabs'
 
 type Operations = {
   finished_count: number
@@ -52,7 +56,18 @@ function Metrics({ rows }: { rows: [string, string | number][] }) {
   ))}</dl>
 }
 
-export default function Dashboard({ accessKey }: { accessKey: string }) {
+function TrendNote({ value, better }: { value: Trend; better: 'up' | 'down' }) {
+  if (!value) return <span className="ui-trend">Sem base no período anterior</span>
+  const Icon = value.direction === 'up' ? TrendingUp : value.direction === 'down' ? TrendingDown : Minus
+  const tone = value.direction === 'flat' ? 'neutral' : value.direction === better ? 'good' : 'bad'
+  return <span className="ui-trend" data-tone={tone}><Icon aria-hidden="true" size={14}/>{value.label}
+    <span className="sr-only"> em relação ao período anterior</span><span aria-hidden="true"> vs. anterior</span></span>
+}
+
+type View = 'all' | 'production' | 'commercial' | 'quality'
+
+export default function Dashboard({ accessKey, onNavigate }: { accessKey: string; onNavigate?: (module: string) => void }) {
+  const [view, setView] = useState<View>('all')
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
   const preferenceKey = 'purezza:indicators:' + accessKey
   const [initial] = useState(() => dashboardPreferences({
@@ -73,6 +88,16 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
       return data as Report
     },
   })
+  const before = previousPeriod(period)
+  const previous = useQuery({
+    queryKey: ['role-dashboard', accessKey, before],
+    enabled: report.isSuccess,
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.rpc('role_dashboard', { from_day: before.from, to_day: before.to }).abortSignal(signal)
+      if (error) throw new Error(error.message)
+      return data as Report
+    },
+  })
   useEffect(() => {
     if (!report.isSuccess) return
     try {
@@ -83,6 +108,9 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
   }, [grouping, period, preferenceKey, report.isSuccess])
   const operations = report.data?.operations
   const commercial = report.data?.commercial
+  const prevOps = previous.data?.operations
+  const prevCom = previous.data?.commercial
+  const show = (section: Exclude<View, 'all'>) => view === 'all' || view === section
   const productionMetrics: [string, string | number][] = operations ? [
     ['Massadas finalizadas', operations.finished_count],
     ['Massadas com peso registrado', `${operations.measured_count} de ${operations.finished_count}`],
@@ -167,43 +195,87 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
   }
 
   return <section className="panel indicator-panel">
-    <h1>Indicadores</h1>
-    <div className="indicator-filter" role="group" aria-label="Atalhos de período">
-      {dashboardPresets.map(([preset, label]) => {
-        const dates = dashboardPeriod(preset, today)
-        return <button type="button" key={preset} className="secondary" disabled={exporting}
-          aria-pressed={dates.from === period.from && dates.to === period.to}
-          onClick={() => {
-            setFrom(dates.from)
-            setTo(dates.to)
-            setPeriod(dates)
-            setExpandedBucket(null)
-            setExportError('')
-          }}>{label}</button>
-      })}
+    <PageHeader icon={Gauge} title="Visão geral"
+      description={`Indicadores de ${dateLabel(period.from)} a ${dateLabel(period.to)}, comparados ao período anterior de mesmo tamanho.`}
+      actions={report.isSuccess && <>
+        <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('pdf')}><FileText aria-hidden="true" size={16}/>Exportar PDF</button>
+        <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('xlsx')}><FileSpreadsheet aria-hidden="true" size={16}/>Exportar Excel</button>
+      </>}/>
+    <div className="ui-filterbar" role="search">
+      <div className="ui-filterbar-fields">
+        <div className="indicator-filter" role="group" aria-label="Atalhos de período">
+          {dashboardPresets.map(([preset, label]) => {
+            const dates = dashboardPeriod(preset, today)
+            return <button type="button" key={preset} className="secondary" disabled={exporting}
+              aria-pressed={dates.from === period.from && dates.to === period.to}
+              onClick={() => {
+                setFrom(dates.from)
+                setTo(dates.to)
+                setPeriod(dates)
+                setExpandedBucket(null)
+                setExportError('')
+              }}>{label}</button>
+          })}
+        </div>
+        <form className="ui-inline-form" onSubmit={event => {
+          event.preventDefault()
+          setExportError('')
+          setExpandedBucket(null)
+          setPeriod({ from, to })
+        }}>
+          <label>Data inicial <input type="date" required max={to || today} value={from} onChange={event => setFrom(event.target.value)} /></label>
+          <label>Data final <input type="date" required min={from} max={today} value={to} onChange={event => setTo(event.target.value)} /></label>
+          <div><button type="submit" disabled={exporting}>Consultar</button></div>
+        </form>
+      </div>
     </div>
-    <form className="indicator-filter" onSubmit={event => {
-      event.preventDefault()
-      setExportError('')
-      setExpandedBucket(null)
-      setPeriod({ from, to })
-    }}>
-      <label>Data inicial <input type="date" required max={to || today} value={from} onChange={event => setFrom(event.target.value)} /></label>
-      <label>Data final <input type="date" required min={from} max={today} value={to} onChange={event => setTo(event.target.value)} /></label>
-      <button type="submit" disabled={exporting}>Consultar</button>
-    </form>
-    {report.isPending && <p role="status">Carregando indicadores…</p>}
-    {report.isError && <p role="alert">Falha ao consultar indicadores. {report.error.message}</p>}
+    {report.isPending && <Skeleton lines={6} label="Carregando indicadores…"/>}
+    {report.isError && <ErrorState title="Falha ao consultar indicadores" description={report.error.message} onRetry={() => void report.refetch()}/>}
+    {exporting && <p role="status">Gerando relatório…</p>}
+    {exportError && <p className="ui-message" data-tone="danger" role="alert">{exportError}</p>}
     {report.isSuccess && <>
-      <p>Período consultado de {dateLabel(period.from)} a {dateLabel(period.to)}</p>
-      <div className="indicator-filter">
-        <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('pdf')}>Exportar PDF</button>
-        <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('xlsx')}>Exportar Excel</button>
+      <Tabs label="Departamento" value={view} onChange={setView} items={[
+        { id: 'all', label: 'Todos' },
+        { id: 'production', label: 'Produção', hidden: !operations },
+        { id: 'quality', label: 'Qualidade e estoque', hidden: !operations },
+        { id: 'commercial', label: 'Comercial', hidden: !commercial },
+      ]}/>
+      <div className="ui-stat-grid">
+        {operations && show('production') && <>
+          <StatCard icon={Factory} label="Massadas finalizadas" value={operations.finished_count}
+            context={<TrendNote value={trend(operations.finished_count, prevOps?.finished_count)} better="up"/>}
+            onOpen={onNavigate && (() => onNavigate('production-board'))}/>
+          <StatCard icon={Scale} label="Peso medido" value={operations.measured_kg === null ? 'N/D' : formatStockQuantity(operations.measured_kg)}
+            unit={operations.measured_kg === null ? undefined : 'kg'}
+            context={<TrendNote value={trend(operations.measured_kg, prevOps?.measured_kg)} better="up"/>}/>
+          <StatCard icon={AlertTriangle} label="Perdas sobre a produção" value={percent(operations.linked_loss_pct)}
+            tone={operations.linked_loss_pct !== null && Number(operations.linked_loss_pct) > 3 ? 'warning' : 'neutral'}
+            context={<TrendNote value={trend(operations.linked_loss_pct, prevOps?.linked_loss_pct, 'points')} better="down"/>}
+            onOpen={onNavigate && (() => onNavigate('losses'))}/>
+        </>}
+        {operations && show('quality') && <>
+          <StatCard icon={CalendarX} label="Lotes vencidos ou vencendo hoje" value={operations.expired_lots}
+            tone={operations.expired_lots > 0 ? 'danger' : 'success'} context="Saldo atual"
+            onOpen={onNavigate && (() => onNavigate('inventory'))}/>
+          <StatCard icon={CalendarX} label="Liberados vencendo em 7 dias" value={operations.expiring_released_lots}
+            tone={operations.expiring_released_lots > 0 ? 'warning' : 'success'} context="Saldo atual"
+            onOpen={onNavigate && (() => onNavigate('inventory'))}/>
+        </>}
+        {commercial && show('commercial') && <>
+          <StatCard icon={ClipboardList} label="Pedidos em aberto" value={commercial.open_orders} context="Situação atual"
+            onOpen={onNavigate && (() => onNavigate('orders'))}/>
+          <StatCard icon={AlertTriangle} label="Pedidos atrasados" value={commercial.overdue_orders}
+            tone={commercial.overdue_orders > 0 ? 'danger' : 'success'} context="Situação atual"
+            onOpen={onNavigate && (() => onNavigate('orders'))}/>
+          <StatCard icon={BadgeCheck} label="OTIF (completo e no prazo)" value={percent(commercial.otif_pct)}
+            context={<TrendNote value={trend(commercial.otif_pct, prevCom?.otif_pct, 'points')} better="up"/>}/>
+          <StatCard icon={Receipt} label="Valor faturado" value={commercial.billed_amount === null ? 'N/D' : formatBrl(commercial.billed_amount)}
+            context={<TrendNote value={trend(commercial.billed_amount, prevCom?.billed_amount)} better="up"/>}/>
+        </>}
       </div>
     </>}
-    {exporting && <p role="status">Gerando relatório…</p>}
-    {exportError && <p role="alert">{exportError}</p>}
-    {operations && <section>
+    {operations && (show('production') || show('quality')) && <section className="ui-detail">
+      {show('production') && <>
       <h2>Produção e perdas</h2>
       <Metrics rows={productionMetrics} />
       <p>{productionNote}</p>
@@ -260,10 +332,13 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
           </tr>)}</tbody>
         </table></div>
       </> : <p>N/D. Nenhuma perda de massa registrada no período.</p>}
+      </>}
+      {show('quality') && <>
       <h2>Validade dos lotes com saldo atual</h2>
       <Metrics rows={expiryMetrics} />
+      </>}
     </section>}
-    {commercial && <section>
+    {commercial && show('commercial') && <section className="ui-detail">
       <h2>Pedidos, entregas e faturamento</h2>
       <Metrics rows={commercialMetrics} />
       <p>{commercialNote}</p>

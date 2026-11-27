@@ -1,5 +1,8 @@
 import { lazy, Suspense, useState } from 'react'
 import { canNavigate } from '../../layouts/AppShell'
+import { ArrowLeft, FileBarChart, SearchX } from 'lucide-react'
+import { Badge, EmptyState, PageHeader } from '../../ui'
+import { FilterBar, SearchInput } from '../../ui/filters'
 
 const Dashboard = lazy(() => import('../dashboard/Dashboard'))
 const reports = [
@@ -25,25 +28,24 @@ export default function ReportCenter({ role, accountScope, onNavigate }: {
   const visible = allowed.filter(report => (!category || report.category === category)
     && searchKey(`${report.title} ${report.detail}`).includes(needle))
   if (preview) return <>
-    <button type="button" className="secondary" onClick={() => setPreview(false)}>Voltar à central de relatórios</button>
+    <button type="button" className="secondary" onClick={() => setPreview(false)}><ArrowLeft aria-hidden="true" size={16}/>Voltar à central de relatórios</button>
     <Suspense fallback={<p role="status">Abrindo relatório…</p>}>
-      <Dashboard accessKey={accountScope}/>
+      <Dashboard accessKey={accountScope} onNavigate={onNavigate}/>
     </Suspense>
   </>
   return <section className="panel">
-    <h1>Central de relatórios</h1>
-    <div className="indicator-filter">
-      <label>Buscar relatório <input type="search" value={term} onChange={event => setTerm(event.target.value)}/></label>
+    <PageHeader icon={FileBarChart} title="Central de relatórios" description="Consultas e relatórios disponíveis para o seu perfil."/>
+    <FilterBar activeCount={[term, category].filter(Boolean).length} onClear={() => { setTerm(''); setCategory('') }}>
+      <SearchInput label="Buscar relatório" value={term} onChange={setTerm}/>
       <label>Categoria <select value={category} onChange={event => setCategory(event.target.value)}>
         <option value="">Todas</option>
         {categories.map(option => <option key={option}>{option}</option>)}
       </select></label>
-      <button type="button" className="secondary" disabled={!term && !category}
-        onClick={() => { setTerm(''); setCategory('') }}>Limpar filtros</button>
-    </div>
-    {!visible.length && <p role="status">Nenhum relatório encontrado para os filtros atuais.</p>}
+    </FilterBar>
+    {!visible.length && <EmptyState icon={SearchX} title="Nenhum relatório encontrado" description="Ajuste a busca ou a categoria."/>}
     <ul className="report-center">
       {visible.map(report => <li key={report.module}>
+        <Badge tone="info">{report.category}</Badge>
         <h2>{report.title}</h2>
         <p>{report.detail}</p>
         <button type="button" className="secondary" onClick={() => {

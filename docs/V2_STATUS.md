@@ -2,44 +2,51 @@
 
 Base da matriz: os 31 tópicos da especificação original e os critérios complementares de conclusão. O estado representa o tópico inteiro. A coluna **Evidência** identifica entregas parciais quando o tópico ainda está em desenvolvimento.
 
-Portal de produção: [Sabor Purezza SMART](https://appsaborpurezza.github.io/gestao/). Referência publicada confirmada: [commit b3b55c9](https://github.com/appsaborpurezza/gestao/commit/b3b55c92e7f9f0f2d02e3dc965c3494297164cd6). Produção tinha 46 migrations na inspeção anterior. A migration de perfis foi aplicada em homologação e rejeitada em produção pela revisão automática devido à falta de backup. [PR #5](https://github.com/appsaborpurezza/gestao/pull/5)
+Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://appsaborpurezza.github.io/gestao/). Produção tem 49 migrations (V1 001–041 e V2 001–008), aplicadas em 27/11/2026 após um backup lógico verificado por MD5. PRs integrados: #1 a #7.
+
+**Limite da homologação:** o ambiente de desenvolvimento não alcança o Supabase pela rede. Por isso, as telas foram validadas com dados reais de homologação servidos por mocks, e as regras de banco foram validadas por SQL autenticado com usuários de teste. O E2E com login real (Playwright contra homologação) ainda depende de uma execução com acesso de rede. Nenhum item está marcado como HOMOLOGADO por esse motivo.
 
 | Tópico e requisito | Estado | Arquivos | Migration | Teste | Evidência | Pendências |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01. Contexto e ambientes | PUBLICADO | README, workflow Pages | V1 001–041; V2 001–005 | Smoke do portal | GitHub Pages e Supabase de produção implantados | — |
-| 02. Objetivos de modernização | EM DESENVOLVIMENTO | `AppShell.tsx`, `styles.css`, módulos | V2 001–006 | Regressão local | PRs #1–#5 | Concluir módulos, usabilidade e desempenho |
-| 03. Preservação da V1 | EM DESENVOLVIMENTO | `supabase/migrations`, `foundation.test.ts` | Incrementais V2 | Regressão SQL e build | Nenhuma migration V1 modificada | Regressão autenticada completa |
-| 04. Identidade visual | EM DESENVOLVIMENTO | `public/logo.png`, `Access.tsx`, `styles.css` | — | Verificação pública do login | PR #3 | Auditoria de todas as telas, etiquetas e relatórios |
-| 05. Arquitetura React | IMPLEMENTADO | `main.tsx`, `layouts`, `features` | — | TypeScript e build | Carregamento por módulo | — |
-| 06. AppShell e navegação | EM DESENVOLVIMENTO | `AppShell.tsx`, `appNavigation.test.ts` | — | Acesso a módulos por perfil | PR #1 | Menu da conta e validação autenticada responsiva |
-| 07. Busca global | EM DESENVOLVIMENTO | `RecordSearch.tsx`, `main.tsx`, `Traceability.tsx` | V2 004, 007 | Acentos, paginação e acesso a lotes por perfil | PR #2 em produção; busca e abertura de lotes na V2 007 | Buscar OPs, massadas, fornecedores, fabricantes e expedições |
-| 08. Padrão de buscas e filtros | EM DESENVOLVIMENTO | `RecordSearch.tsx`, `ProductionBoard.tsx`, `ReportCenter.tsx` | V2 001, 004 | Paginação e filtro do Kanban | Busca paginada existente | Cobertura uniforme de todos os módulos |
-| 09. Tabelas modernas | EM DESENVOLVIMENTO | `styles.css`, listagens dos módulos | — | Build | Estilos comuns no PR #3 | Ordenação, colunas, densidade e auditoria responsiva |
-| 10. Formulários | EM DESENVOLVIMENTO | Formulários dos módulos e `styles.css` | — | Validações SQL V1 | Fluxos existentes preservados | Combobox, confirmação e retenção de estado em todos os formulários |
-| 11. Dashboard executivo | EM DESENVOLVIMENTO | `Dashboard.tsx`, `dashboardPeriods.ts` | V1 041 | Períodos, Pareto, série e exportações | Indicadores em produção, atalhos no PR #5 | Indicadores faltantes e navegação para detalhamento |
-| 12. Painéis departamentais | NÃO INICIADO | — | — | — | Indicadores gerais existentes | Quatro painéis com filtros e detalhamento |
-| 13. Kanban | EM DESENVOLVIMENTO | `ProductionBoard.tsx` e componentes produtivos | V2 001–003 | Paginação por coluna, RLS e regressão de etapas | Kanban publicado; lista por etapa e painel lateral em desenvolvimento | Visão por OP, filtros restantes e teste autenticado da lista |
-| 14. Realtime | EM DESENVOLVIMENTO | `useBoardRealtime.ts` | V2 002–003 | Revisão e isolamento SQL em homologação | Postgres Changes configurado em produção | Teste de entrega entre dois dispositivos e medição |
-| 15. Modo TV | EM DESENVOLVIMENTO | `ProductionBoard.tsx`, `styles.css` | V2 001–003 | Build e role gating | Gestão à Vista publicada | Indicadores, operação específica e teste em monitor |
-| 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx`, componentes de apontamento | V1 029–039 | Regressão SQL | Seletor de etapa e ações existentes | UX por estação e E2E em tablet |
-| 17. Estoque V2 | EM DESENVOLVIMENTO | `features/inventory` | V1 003–010, 019, 034, 040 | Regressão de estoque | Recebimento, FEFO, inventários e rastreabilidade existentes | Painel, filtros completos e visão de lotes |
-| 18. Pedidos V2 | EM DESENVOLVIMENTO | `features/orders` | V1 012–023, 034 | Regressão de pedidos, expedição e PDF | Módulos V1 preservados | Filtros, layout e histórico integrado |
-| 19. Receitas V2 | EM DESENVOLVIMENTO | `features/recipes`, `ProductionDemand.tsx` | V1 025–028, 033 | Regressão de fichas e simulação | Revisão, aprovação, associação e planejamento existentes | Novas receitas e versões, pesquisa e revisão de interface |
-| 20. Central de relatórios | EM DESENVOLVIMENTO | `ReportCenter.tsx`, `Dashboard.tsx`, exportadores | V1 009, 041 | Testes de PDF e Excel | Atalhos publicados; pesquisa, categorias e prévia do painel no desenvolvimento | Demais visualizações internas, filtros e saídas por relatório |
-| 21. Alertas operacionais | EM DESENVOLVIMENTO | `OperationalAlerts.tsx` | V2 005 | Perfis, estado vazio, smoke SQL | Produção retornou nove receitas pendentes | Eventos restantes e acesso ao registro exato |
-| 22. Usuários e permissões | BLOQUEADO | `ProfileManagement.tsx` | V2 006 | Edição, vínculo, auditoria, concorrência e proteção do perfil | Teste SQL em homologação, PR #5 | Convites, recuperação pelo portal, histórico na interface e backup para publicação |
-| 23. Recursos do Supabase | EM DESENVOLVIMENTO | Lazy imports, consultas e Realtime | V2 001–005 | Build, advisors | Cache e consultas paginadas nas entregas V2 | Medições V1/V2 e avaliação de índices com volume representativo |
-| 24. Segurança | EM DESENVOLVIMENTO | RLS, RPCs e cache de sessão | V1 001–041, V2 001–006 | RLS e tentativas sem perfil | Advisor de homologação registrou aviso informativo em `operation_requests` | Revisar após cada mudança, testar sessão real e fluxos de convite |
-| 25. Estados da interface | EM DESENVOLVIMENTO | `AppShell.tsx`, módulos | — | Smoke de login e regressão | Estados de erro, vazio e conexão em módulos atualizados | Auditar cobertura e mensagens de todos os módulos |
-| 26. Acessibilidade | EM DESENVOLVIMENTO | `AppShell.tsx`, `styles.css` | — | Navegação básica por teclado | Foco visível, rótulos e diálogo nativo | Auditoria WCAG, leitores de tela e dispositivos |
-| 27. Testes automatizados | EM DESENVOLVIMENTO | `tests` | V1 e V2 | Vitest/PGlite | Regressão local com anexos reais em banco descartável | Cenários Playwright e três perfis reais em homologação |
-| 28. Metas de performance | EM DESENVOLVIMENTO | Build Vite e consultas | V2 001–005 | Build; Performance Advisor anterior | Tamanhos do bundle disponíveis nos builds | Comparativo medido V1/V2, requisições, latência, Egress e logs |
-| 29. Estratégia de execução | EM DESENVOLVIMENTO | Histórico local e PRs #1–#5 | V2 001–006 | Conjuntos por incremento | Entregas publicadas separadamente | Completar fases abertas |
-| 30. Critérios de aceite | EM DESENVOLVIMENTO | Matriz, suíte e módulos | V1 e V2 | Regressão parcial | Evidências nas linhas anteriores | Checklist integral autenticado e validação visual |
-| 31. Entrega final e evidências | EM DESENVOLVIMENTO | `docs/V2_STATUS.md`, README e PRs | V2 006 pendente em produção | Regressão parcial | Matriz registrada e links de publicação | Screenshots completos, relatórios finais, homologação e publicação |
+| 01. Contexto e ambientes | PUBLICADO | README, workflow Pages | V1 001–041; V2 001–008 | Smoke do portal, deploy | Pages publicado a partir da `main` | — |
+| 02. Objetivos de modernização | PUBLICADO | `src/styles/tokens.css`, `shell.css`, `src/ui`, módulos | — | Build, Vitest | PRs #6 a #8 | Módulos restantes no padrão (ver 09–10) |
+| 03. Preservação da V1 | TESTADO | `supabase/migrations`, `foundation.test.ts` | Incrementais V2 | Regressão SQL (PGlite) | Nenhuma migration V1 alterada; RLS intacto; backup antes de cada mudança em produção | Regressão autenticada completa |
+| 04. Identidade visual | PUBLICADO | `public/logo-*`, `index.html`, `Access.tsx`, `CommercialDocument.tsx` | — | Build | Logos otimizados (32 a 512 px, WebP), favicon, ícone maskable, PDF com logo de 512 px | Etiquetas internas |
+| 05. Arquitetura React | IMPLEMENTADO | `main.tsx`, `layouts`, `features`, `ui` | — | TypeScript, build | Carregamento por módulo, componentes reutilizáveis | — |
+| 06. AppShell e navegação | PUBLICADO | `AppShell.tsx`, `navigation.ts`, `routes.ts` | — | `routes.test.ts`, `appNavigation.test.ts` | Sidebar por departamento, recolhível, drawer, menu do usuário, status de conexão, rotas `#/modulo/<id>` | Validação autenticada em dispositivos reais |
+| 07. Busca global | PUBLICADO | `RecordSearch.tsx` | V2 004, 007 | Acentos, paginação, acesso por perfil | Ctrl+K, lotes por código | OPs, massadas, fornecedores e expedições |
+| 08. Padrão de buscas e filtros | PUBLICADO | `ui/filters.tsx`, módulos | V2 008 | `uiHelpers.test.ts`, `accentSearch.test.ts` | FilterBar, debounce, memória na sessão, períodos; busca sem acento no servidor | Expedição e Rastreabilidade |
+| 09. Tabelas modernas | PUBLICADO | `ui/DataTable.tsx` | — | Build, capturas em 4 tamanhos | Produtos, Clientes, Pedidos, Estoque, Posição, Kanban (lista), Receitas | Expedição, Desperdícios, Cadastros operacionais |
+| 10. Formulários | EM DESENVOLVIMENTO | `ui/Combobox.tsx`, `Customers.tsx`, `Orders.tsx`, `Inventory.tsx` | — | Validações SQL V1 | Combobox, seções, aviso de não salvo em Clientes | Demais formulários (Expedição, Cadastros, Perdas) |
+| 11. Dashboard executivo | PUBLICADO | `Dashboard.tsx`, `trend.ts` | V1 041 | `trend.test.ts`, Pareto, séries, exportações | Cards com tendência contra o período anterior e atalhos de detalhamento | Indicadores novos (ex.: produtividade por etapa) |
+| 12. Painéis departamentais | IMPLEMENTADO | `Dashboard.tsx` | V1 041 | Build | Abas Produção, Qualidade e estoque, Comercial | Indicadores específicos por departamento |
+| 13. Kanban | PUBLICADO | `ProductionBoard.tsx`, `boardState.ts` | V2 001–003 | `boardState.test.ts`, RLS | Cards compactos, cor por etapa, prazo, painel lateral, lista em DataTable | Visão por OP, arrastar com formulário |
+| 14. Realtime | PUBLICADO | `useBoardRealtime.ts` | V2 002–003 | SQL homologação | Canal único, pausa em aba oculta | Teste entre dois dispositivos |
+| 15. Modo TV | PUBLICADO | `ProductionBoard.tsx` | V2 001–003 | Build | Gestão à vista | Indicadores e relógio |
+| 16. Operação em tablets | EM DESENVOLVIMENTO | `ProductionBoard.tsx` | V1 029–039 | Capturas em tablet | Sidebar compacta, uma etapa por vez no celular | Terminal por estação, E2E em tablet |
+| 17. Estoque V2 | PUBLICADO | `features/inventory` | V1 003–010, 019, 034, 040 | `lotStatus.test.ts`, exportação | Lotes com filtros de situação e validade, ficha do lote pela URL, recebimento em seções, FEFO, posição por data | Inventário em sessões no novo padrão |
+| 18. Pedidos V2 | PUBLICADO | `features/orders` | V1 012–023, 034; V2 008 | `uiHelpers.test.ts`, PDF | Lista com filtros, prazo, busca sem acento, Combobox | Expedição no novo padrão |
+| 19. Receitas V2 | PUBLICADO | `RecipeList.tsx`, `RecipeReview.tsx` | V1 025–028, 033 | Build | Lista com busca por ingrediente e situação | Criação de receita nova pela interface |
+| 20. Central de relatórios | PUBLICADO | `ReportCenter.tsx` | V1 009, 041 | PDF e Excel | Catálogo com filtros e prévia do painel | Relatórios adicionais |
+| 21. Alertas operacionais | PUBLICADO | `OperationalAlerts.tsx` | V2 005 | Smoke SQL | Cards por severidade com atalho | Abrir o registro exato |
+| 22. Usuários e permissões | PUBLICADO | `ProfileManagement.tsx` | V2 006 | SQL homologação | Gestão auditada de perfis e vínculo de contas | Convites pelo portal (Edge Function) |
+| 23. Recursos do Supabase | EM DESENVOLVIMENTO | Consultas, índices trigram | V2 001–008 | Advisors | Consultas paginadas, índices de busca | Medição de Egress e Realtime com uso real |
+| 24. Segurança | EM DESENVOLVIMENTO | RLS, RPCs | Todas | Advisor de produção (27/11) | Sem achados novos; `operation_requests` sem policy é intencional | Ativar proteção contra senhas vazadas no painel do Supabase (Auth) |
+| 25. Estados da interface | PUBLICADO | `src/ui` | — | Build | Skeleton, vazio, erro e acesso negado padronizados nos módulos atualizados | Módulos restantes |
+| 26. Acessibilidade | EM DESENVOLVIMENTO | `tokens.css`, `src/ui` | — | Teclado | Contraste AA nos tokens, foco visível, ARIA no Combobox e nas abas | Auditoria WCAG com leitor de tela |
+| 27. Testes automatizados | EM DESENVOLVIMENTO | `tests` | V1 e V2 | 62 testes Vitest/PGlite | Regressão local e migração com unaccent | Playwright autenticado em homologação |
+| 28. Metas de performance | EM DESENVOLVIMENTO | Build Vite | — | Build | Logo de login caiu de 1,23 MB para WebP de 320 px | Medição autenticada V1/V2 |
+| 29. Estratégia de execução | PUBLICADO | PRs #1–#8 | V2 001–008 | CI em cada PR | Entregas incrementais | — |
+| 30. Critérios de aceite | EM DESENVOLVIMENTO | Matriz e módulos | V1 e V2 | Regressão parcial | Linhas acima | Checklist autenticado |
+| 31. Entrega final e evidências | EM DESENVOLVIMENTO | Este documento, README, capturas | V2 001–008 em produção | Regressão parcial | Backup verificado, publicação, capturas por módulo | Homologação autenticada |
+| PWA (complementar) | PUBLICADO | `public/manifest.webmanifest` | — | Build | Manifesto com ícones e cor da marca | Service worker (fora do escopo) |
 
-V1 001–041 refere-se à série `2026112400xxx`. V2 001–006 refere-se à série `20261127000x00`. Nomes exatos e ordenação estão em [supabase/migrations](../supabase/migrations).
+V1 001–041 refere-se à série `2026112400xxx`. V2 001–008 refere-se à série `20261127000x00`. Nomes exatos e ordenação estão em [supabase/migrations](../supabase/migrations).
 
 ## Implantação e recuperação
 
-O PR #5 permanece em rascunho enquanto a migration de perfis estiver bloqueada. Confirme o backup ou autorização específica e a restauração em ambiente separado antes de aplicar mudanças em produção. Publique os módulos dependentes somente após verificar as RPCs no ambiente alvo. Em falha de frontend, republicar o último commit compatível no GitHub Pages preserva os dados. Reverta o banco somente por procedimento validado ou migration corretiva, sem reset.
+1. Antes de qualquer migration em produção, gere o backup lógico (todas as tabelas de `public` e `purezza_private` como `jsonb`) e confira o MD5 com o calculado no servidor. O backup de 27/11/2026 está na pasta de arquivos do projeto (`backups/producao-20261127T0609Z`).
+2. Aplique as migrations novas primeiro em homologação, valide com SQL autenticado e depois aplique em produção.
+3. Publique o front somente depois das migrations de que ele depende. Exemplo: a busca de Clientes e Pedidos usa `search_text` (V2 008).
+4. A publicação é manual: Actions → "Publicar no GitHub Pages" → Run workflow na `main`.
+5. Em falha de frontend, republicar o último commit compatível no GitHub Pages preserva os dados. Reverta o banco somente por migration corretiva, nunca por reset.
