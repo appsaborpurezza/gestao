@@ -165,7 +165,7 @@ export default function Dashboard({ accessKey }: { accessKey: string }) {
     }
   }
 
-  return <section className="panel">
+  return <section className="panel indicator-panel">
     <h1>Indicadores</h1>
     <form className="indicator-filter" onSubmit={event => {
       event.preventDefault()
