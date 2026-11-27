@@ -51,6 +51,7 @@ header .secondary { color: white; }
 nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 24px; }
 nav button[aria-pressed=false] { background: #e6f0f8; color: #07558b; }
 form { display: grid; gap: 14px; }
+form[hidden] { display: none; }
 label { display: grid; gap: 5px; font-weight: 600; }
 button, input, select, summary { min-height: 44px; font: inherit; }
 button { background: var(--brand-blue); border: 0; border-radius: var(--radius-control); padding: 9px 16px; color: white; font-weight: 650; cursor: pointer; }

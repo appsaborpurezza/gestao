@@ -8,10 +8,11 @@ const departments = [
   { label: 'Estoque e logística', entries: [['inventory', 'Estoque'], ['shipping', 'Expedição']] },
   { label: 'Qualidade', entries: [['traceability', 'Rastreabilidade'], ['recall', 'Recolhimentos'], ['losses', 'Desperdícios']] },
   { label: 'Cadastros', entries: [['products', 'Produtos'], ['operational-catalog', 'Cadastros operacionais'], ['recipe-assignments', 'Associações de receitas'], ['import', 'Importação']] },
+  { label: 'Administração', entries: [['profiles', 'Usuários e permissões']] },
 ]
 const operational = new Set(['production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
 const commercial = new Set(['orders', 'customers'])
-const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import'])
+const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import', 'profiles'])
 const shared = new Set(['dashboard', 'alerts', 'reports', 'products', 'production-board', 'shipping'])
 
 export function canNavigate(id: string, role: string) {
