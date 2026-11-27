@@ -87,15 +87,15 @@ function ProductForm({ editor, onDirty, onSaved }: { editor: Editor; onDirty: (d
  * Catálogo de produtos. O catálogo é pequeno (dezenas de itens) e já é consultado com colunas selecionadas,
  * então filtros e ordenação rodam no navegador. Tabelas volumosas usam o modo servidor do DataTable.
  */
-export function ProductCatalog({ items, loading, error, onRetry, canConfigure, onConfigure, focused, onShowAll }: {
+export function ProductCatalog({ items, loading, error, onRetry, canConfigure, onConfigure, focused, onShowAll, startNew = false }: {
   items: CatalogItem[] | undefined; loading: boolean; error: boolean; onRetry: () => void
-  canConfigure: boolean; onConfigure: (id: string) => void; focused: boolean; onShowAll: () => void
+  canConfigure: boolean; onConfigure: (id: string) => void; focused: boolean; onShowAll: () => void; startNew?: boolean
 }) {
   const cache = useQueryClient()
   const [filters, setFilters] = useSessionState('products', { term: '', classification: '', unit: '', status: '' })
   const term = useDebouncedValue(filters.term)
   const active = [filters.term, filters.classification, filters.unit, filters.status].filter(Boolean).length
-  const [editor, setEditor] = useState<Editor | null>(null)
+  const [editor, setEditor] = useState<Editor | null>(startNew && canConfigure ? { mode: 'new' } : null)
   const [dirty, setDirty] = useState(false)
   const lifecycle = useLifecycle()
   const lifecycleItem = items?.find(item => item.id === lifecycle.recordId)

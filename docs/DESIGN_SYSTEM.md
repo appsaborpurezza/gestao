@@ -22,3 +22,27 @@ Arquivo-fonte `public/logo.png` (1254×1254, PNG com transparência real). Vers�
 
 ## Navegação por URL
 `src/lib/routes.ts`: rotas `#/modulo` e `#/modulo/<uuid>`, compatíveis com GitHub Pages (voltar, avançar, atualizar e link direto). Fragmentos de autenticação do Supabase são ignorados. O acesso continua decidido pelo servidor (RLS/RPC); endereços sem permissão exibem `ForbiddenState`.
+
+## Componentes de cadastro (`src/ui/records.tsx`, `src/ui/toast.tsx`)
+- `RecordActions`: "Editar" visível e menu de três pontos com as ações secundárias. Teclado: setas, Home, End, Esc (volta o foco ao botão). O menu é fixo na tela para não ser cortado pela rolagem da tabela.
+- `lifecycleActions(active, open)`: Histórico, Dependências, Inativar ou Reativar (conforme a situação) e Excluir.
+- `Modal`: `<dialog>` nativo com foco preso e retorno ao elemento de origem. `RecordDrawer`: formulário lateral (tela cheia no celular) que pede confirmação antes de descartar alterações.
+- `CatalogLifecycleDialog`: prévia de dependências, exclusão com confirmação digitada, inativação com motivo, reativação e histórico paginado. Quem decide é o banco; a tela só apresenta.
+- `SimilarRecords`: aviso não bloqueante de cadastros parecidos enquanto o usuário digita.
+- `toast(texto, tom)` e `<Toaster/>`: aviso discreto, só depois da resposta definitiva do servidor.
+- `friendlyError` (`src/lib/catalog.ts`): nunca mostra SQL cru. `useIdempotentRpc`: mesma chave `request_id` para reenvios do mesmo conteúdo.
+
+Exemplo:
+```tsx
+const lifecycle = useLifecycle()
+<DataTable rowActions={row => <RecordActions label={row.name} onEdit={() => edit(row)}
+  actions={lifecycleActions(row.active, mode => lifecycle.open(row.id, mode))}/>} … />
+<CatalogLifecycleDialog entity="FORNECEDOR" recordId={lifecycle.recordId} mode={lifecycle.mode}
+  onClose={lifecycle.close} onModeChange={lifecycle.setMode} onDone={refresh}/>
+```
+
+## Workspace (`src/lib/workspace.ts`, `src/ui/QuickActions.tsx`)
+- Favoritos, recentes e departamentos recolhidos por usuário em `localStorage` (`purezza:workspace:<id>`). Guarda apenas identificadores de módulos; permissões são revalidadas ao exibir.
+- Estrela no cabeçalho marca a página atual como favorita; favoritos aparecem no topo da sidebar.
+- Ações rápidas por perfil (`quickActions`), na Visão geral e na paleta Ctrl+K. Abrem o formulário por rota de ação (`#/orders/novo`, `#/inventory/receber`, `#/losses/registrar`); nunca gravam sozinhas. Depois de abrir, o endereço volta para `#/modulo`, para que atualizar a página não reabra o formulário.
+- Paleta Ctrl+K: grupos Ações, Recentes, Módulos e Registros, destaque do trecho encontrado, setas/Home/End e Enter.

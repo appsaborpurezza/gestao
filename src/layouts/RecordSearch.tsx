@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { highlightParts } from '../lib/text'
+
+function Marked({ text, term }: { text: string; term: string }) {
+  return <>{highlightParts(text, term).map((part, index) => part.match ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>)}</>
+}
 
 const categories = [
   ['products', 'Produtos'], ['customers', 'Clientes'], ['orders', 'Pedidos'], ['recipes', 'Receitas'], ['traceability', 'Lotes'],
@@ -43,8 +48,8 @@ export function RecordSearch({ term, accountScope, onOpen }: {
       return found.length > 0 && <section key={module}>
         <h3>{title}</h3>
         <ul>{found.map(record => <li key={record.record_id}>
-          <button type="button" className="secondary" onClick={() => onOpen(record)}>
-            {record.reference} · {record.label}
+          <button type="button" className="secondary" data-palette onClick={() => onOpen(record)}>
+            <span><Marked text={record.reference} term={current}/> · <Marked text={record.label} term={current}/></span>
           </button>
         </li>)}</ul>
       </section>

@@ -66,7 +66,7 @@ function TrendNote({ value, better }: { value: Trend; better: 'up' | 'down' }) {
 
 type View = 'all' | 'production' | 'commercial' | 'quality'
 
-export default function Dashboard({ accessKey, onNavigate }: { accessKey: string; onNavigate?: (module: string) => void }) {
+export default function Dashboard({ accessKey, onNavigate, quickActions }: { accessKey: string; onNavigate?: (module: string) => void; quickActions?: React.ReactNode }) {
   const [view, setView] = useState<View>('all')
   const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
   const preferenceKey = 'purezza:indicators:' + accessKey
@@ -201,6 +201,7 @@ export default function Dashboard({ accessKey, onNavigate }: { accessKey: string
         <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('pdf')}><FileText aria-hidden="true" size={16}/>Exportar PDF</button>
         <button type="button" className="secondary" disabled={exporting} onClick={() => void exportReport('xlsx')}><FileSpreadsheet aria-hidden="true" size={16}/>Exportar Excel</button>
       </>}/>
+    {quickActions}
     <div className="ui-filterbar" role="search">
       <div className="ui-filterbar-fields">
         <div className="indicator-filter" role="group" aria-label="Atalhos de período">

@@ -147,10 +147,10 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   </section>
 }
 
-export function Customers({ initialCustomer, onOpen, admin = false }: { initialCustomer?: string; onOpen?: (id: string | null) => void; admin?: boolean }) {
+export function Customers({ initialCustomer, onOpen, admin = false, startNew = false }: { initialCustomer?: string; onOpen?: (id: string | null) => void; admin?: boolean; startNew?: boolean }) {
   const lifecycleCache = useQueryClient()
   const lifecycle = useLifecycle()
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState(startNew)
   const editor = creating ? 'new' : initialCustomer ?? null
   const setEditor = (id: string | null) => {
     setCreating(id === 'new')

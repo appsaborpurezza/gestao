@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type Route = { module: string; recordId: string | null }
+/** `action` abre um formulário do módulo, ex.: `#/orders/novo`. Nunca executa alterações sozinho. */
+export type Route = { module: string; recordId: string | null; action?: RouteAction }
+export const routeActions = ['novo', 'receber', 'registrar'] as const
+export type RouteAction = typeof routeActions[number]
 
 const defaultModule = 'dashboard'
 const modulePattern = /^[a-z][a-z-]{1,40}$/
@@ -11,11 +14,12 @@ export function parseRoute(hash: string): Route {
   if (!hash.startsWith('#/')) return { module: defaultModule, recordId: null }
   const [module = '', record = ''] = hash.slice(2).split('/')
   if (!modulePattern.test(module)) return { module: defaultModule, recordId: null }
+  if ((routeActions as readonly string[]).includes(record)) return { module, recordId: null, action: record as RouteAction }
   return { module, recordId: recordPattern.test(record) ? record.toLowerCase() : null }
 }
 
-export function formatRoute({ module, recordId }: Route) {
-  return `#/${module}${recordId ? `/${recordId}` : ''}`
+export function formatRoute({ module, recordId, action }: Route) {
+  return `#/${module}${recordId ? `/${recordId}` : action ? `/${action}` : ''}`
 }
 
 /** Navegação por hash, compatível com GitHub Pages: voltar, avançar, atualizar e link direto. */

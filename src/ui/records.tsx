@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Ban, History, Link2, MoreVertical, Pencil, RotateCcw, Trash2, X, type LucideIcon } from 'lucide-react'
+import { Ban, History, Link2, MoreVertical, Pencil, Plus, RotateCcw, Trash2, X, type LucideIcon } from 'lucide-react'
 import { Badge, ErrorState, Skeleton } from './index'
 import { toast } from './toast'
 import { useDebouncedValue } from './filters'
@@ -111,7 +112,8 @@ export function Modal({ open, title, onClose, children, wide, drawer, guard }: {
   }, [open])
   useEffect(() => () => { (origin.current as HTMLElement | null)?.focus?.() }, [])
   const requestClose = () => { if (!guard?.()) onClose() }
-  return <dialog ref={ref} className={drawer ? 'ui-drawer' : 'ui-modal'} data-wide={wide || undefined} aria-labelledby={titleId}
+  // Portal no body: evita formulário dentro de formulário quando o diálogo nasce dentro de um form.
+  return createPortal(<dialog ref={ref} className={drawer ? 'ui-drawer' : 'ui-modal'} data-wide={wide || undefined} aria-labelledby={titleId}
     onCancel={event => { event.preventDefault(); requestClose() }}
     onClose={() => { if (open) onClose(); (origin.current as HTMLElement | null)?.focus?.() }}>
     <header className="ui-modal-header">
@@ -119,7 +121,7 @@ export function Modal({ open, title, onClose, children, wide, drawer, guard }: {
       <button type="button" className="icon-button" aria-label="Fechar" onClick={requestClose}><X aria-hidden="true" size={20}/></button>
     </header>
     <div className="ui-modal-body">{open && children}</div>
-  </dialog>
+  </dialog>, document.body)
 }
 
 /**
@@ -324,4 +326,47 @@ export function SimilarRecords({ entity, term, excludeId }: { entity: CatalogEnt
       {row.code && row.code !== row.name && <span className="ui-code">{row.code} </span>}{row.name}{!row.active && ' (inativo)'}
     </li>)}</ul>
   </div>
+}
+
+/**
+ * Cadastro rápido sem sair do formulário de origem: abre um diálogo, grava pelo mesmo RPC dos
+ * cadastros (que confere a permissão) e devolve o id para o seletor já preenchido.
+ */
+export function QuickCreate({ entity, catalog, label, onCreated }: {
+  entity: CatalogEntity; catalog: 'FORNECEDOR' | 'FABRICANTE'; label: string; onCreated: (id: string, name: string) => Promise<void> | void
+}) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const { run, busy } = useIdempotentRpc()
+  async function save() {
+    setError('')
+    try {
+      const id = await run<string>('save_operational_catalog', {
+        catalog, target: null, expected_version: null, input: { label: name.trim(), active: true },
+      }, 'Não foi possível cadastrar.')
+      await onCreated(id, name.trim())
+      toast(entityLabels[entity] + ' cadastrado e selecionado.')
+      setOpen(false); setName('')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível cadastrar.') }
+  }
+  return <>
+    <button type="button" className="secondary ui-quick-create" onClick={() => setOpen(true)}>
+      <Plus aria-hidden="true" size={16}/>{label}
+    </button>
+    <Modal open={open} title={label} onClose={() => { setOpen(false); setError('') }}>
+      {/* Formulário próprio: Enter aqui não envia o formulário de origem. */}
+      <form className="ui-form" onSubmit={event => { event.preventDefault(); event.stopPropagation(); if (name.trim()) void save() }}>
+        <label><span>Nome <span className="ui-required" aria-hidden="true">*</span></span>
+          <input value={name} maxLength={180} required autoFocus autoComplete="off" onChange={event => setName(event.target.value)}/></label>
+        <SimilarRecords entity={entity} term={name}/>
+        <p className="ui-muted">O preenchimento do formulário de origem é preservado.</p>
+        {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
+        <div className="ui-modal-actions">
+          <button type="button" className="secondary" onClick={() => setOpen(false)} disabled={busy}>Cancelar</button>
+          <button disabled={busy || !name.trim()}>{busy ? 'Salvando…' : 'Cadastrar e selecionar'}</button>
+        </div>
+      </form>
+    </Modal>
+  </>
 }
