@@ -205,7 +205,7 @@ A branch `feat/v2-modernizacao` parte da referência local `474767a`. O primeiro
 
 O Supabase de produção foi conferido antes da alteração de interface. Foram constatadas 41 migrations, 54 tabelas públicas com RLS, 37 produtos e nove versões de receita. O ambiente Supabase de homologação já existente é `vooyoomskkaivlluioeq`.
 
-A busca por **Ctrl+K** consulta produtos, clientes, pedidos e receitas pela RPC `workspace_search`, além dos módulos disponíveis. Os resultados paginados abrem o registro encontrado. A busca respeita as permissões existentes, não retorna valores comerciais e mantém os termos apenas na memória durante a consulta.
+A busca por **Ctrl+K** consulta produtos, clientes, pedidos e receitas pela RPC `workspace_search`, além dos módulos disponíveis. A migration V2 007 acrescenta lotes para Administração e Produção, pesquisáveis pelo código interno, código original, item ou fabricante. Os resultados paginados abrem o registro encontrado. A busca respeita as permissões existentes, não retorna valores comerciais e mantém os termos apenas na memória durante a consulta.
 
 O login usa o logotipo original e reorganiza o formulário para telas estreitas. As páginas compartilham os estilos de controles, tabelas, foco e painéis. No Kanban, os estados das massadas têm rótulos visíveis e cores correspondentes. Essa atualização é de interface e não requer migrations.
 

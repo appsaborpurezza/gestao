@@ -47,15 +47,15 @@ function Origin({ lot }: { lot: Lot }) {
   </article>
 }
 
-export function Traceability() {
-  const [code, setCode] = useState<string | null>(null)
+export function Traceability({ initialCode }: { initialCode?: string }) {
+  const [code, setCode] = useState<string | null>(initialCode ?? null)
   const panel = useRef<HTMLElement>(null)
   const query = useQuery({
     queryKey: ['inventory', 'trace', code],
     enabled: code !== null,
     staleTime: 0,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('trace_inventory_lot', { internal_code: code })
+    queryFn: async ({ signal }) => {
+      const { data, error } = await supabase.rpc('trace_inventory_lot', { internal_code: code }).abortSignal(signal)
       if (error) throw error
       return data as Trace | null
     },

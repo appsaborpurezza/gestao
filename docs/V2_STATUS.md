@@ -12,7 +12,7 @@ Portal de produção: [Sabor Purezza SMART](https://appsaborpurezza.github.io/ge
 | 04. Identidade visual | EM DESENVOLVIMENTO | `public/logo.png`, `Access.tsx`, `styles.css` | — | Verificação pública do login | PR #3 | Auditoria de todas as telas, etiquetas e relatórios |
 | 05. Arquitetura React | IMPLEMENTADO | `main.tsx`, `layouts`, `features` | — | TypeScript e build | Carregamento por módulo | — |
 | 06. AppShell e navegação | EM DESENVOLVIMENTO | `AppShell.tsx`, `appNavigation.test.ts` | — | Acesso a módulos por perfil | PR #1 | Menu da conta e validação autenticada responsiva |
-| 07. Busca global | EM DESENVOLVIMENTO | `RecordSearch.tsx`, `main.tsx` | V2 004 | Acentos, paginação e acesso | PR #2 e RPC testada em produção | Buscar OPs, massadas, lotes, fornecedores, fabricantes e expedições |
+| 07. Busca global | EM DESENVOLVIMENTO | `RecordSearch.tsx`, `main.tsx`, `Traceability.tsx` | V2 004, 007 | Acentos, paginação e acesso a lotes por perfil | PR #2 em produção; busca e abertura de lotes na V2 007 | Buscar OPs, massadas, fornecedores, fabricantes e expedições |
 | 08. Padrão de buscas e filtros | EM DESENVOLVIMENTO | `RecordSearch.tsx`, `ProductionBoard.tsx`, `ReportCenter.tsx` | V2 001, 004 | Paginação e filtro do Kanban | Busca paginada existente | Cobertura uniforme de todos os módulos |
 | 09. Tabelas modernas | EM DESENVOLVIMENTO | `styles.css`, listagens dos módulos | — | Build | Estilos comuns no PR #3 | Ordenação, colunas, densidade e auditoria responsiva |
 | 10. Formulários | EM DESENVOLVIMENTO | Formulários dos módulos e `styles.css` | — | Validações SQL V1 | Fluxos existentes preservados | Combobox, confirmação e retenção de estado em todos os formulários |

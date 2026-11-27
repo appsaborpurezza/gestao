@@ -169,7 +169,8 @@ function Workspace({ userId }: { userId: string }) {
           <ProductionBoard canStart={role !== 'VENDAS'}/>
         </Suspense>}
         {tab === 'traceability' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo rastreabilidade…</p>}>
-          <Traceability/>
+          <Traceability key={target?.module === 'traceability' ? target.record_id : 'traceability'}
+            initialCode={target?.module === 'traceability' ? target.reference : undefined}/>
         </Suspense>}
         {tab === 'recall' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo recolhimentos…</p>}>
           <Recall canOpen={role === 'ADMINISTRADOR'} canResolve={role === 'ADMINISTRADOR' && profile.data.can_release_lot}/>
