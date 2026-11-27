@@ -35,9 +35,9 @@ Data: 27/11/2026. Base: `main` em `65f4768`, mais os PRs abertos #13 (CRUD unive
 | 8 | Mensagens de erro podiam expor texto do banco | Média | Resolvido com `friendlyError` |
 | 9 | Cadastro rápido contextual (fornecedor no recebimento, cliente no pedido) | Média | Parcial: fornecedor e fabricante no recebimento; cliente no pedido pendente |
 | 10 | Visualizações salvas e chips de filtro removíveis | Média | Resolvido em Pedidos (Atrasados, Entrega nesta semana, Rascunhos) e Clientes, com visualizações do usuário |
-| 11 | Terminal de produção e modo TV dedicados | Alta | Parcial: Kanban com cartões compactos ou detalhados e Gestão à vista existentes; terminal por estação pendente |
+| 11 | Terminal de produção e modo TV dedicados | Alta | Resolvido: Terminal da estação (fila, próxima massada, ações do Kanban) e Modo TV dedicado (tela cheia, sem valores comerciais) |
 | 12 | Timeline de atividades reutilizável em pedidos, OPs e lotes | Média | Parcial: histórico de cadastros pronto; demais registros pendentes |
-| 13 | Onboarding e ajuda contextual | Baixa | Pendente |
+| 13 | Onboarding e ajuda contextual | Baixa | Resolvido: primeiros passos por perfil na Visão geral e central de ajuda pesquisável no menu do usuário |
 
 ## Avaliação (Anexo C)
-Ainda não pontuada. A nota pede teste com usuários reais, com login, em tablet e celular. Ela será registrada depois do E2E e dos testes de usabilidade da seção 50.
+Ainda não pontuada: a nota exige pessoas reais. O roteiro está em `docs/UX_USABILITY_TEST.md` e a folha que calcula a nota ponderada em [Nota de UX SMART](https://claude.ai/artifact/A86jW6ct4NoviVEoD3U4xc). Os resultados de cada sessão entram aqui.

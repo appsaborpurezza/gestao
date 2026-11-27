@@ -11,6 +11,7 @@ import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
 import { Toaster } from './ui/toast'
 import { QuickActions } from './ui/QuickActions'
+import { Onboarding } from './ui/Help'
 import type { QuickAction } from './lib/workspace'
 import { RecipeList } from './features/recipes/RecipeList'
 import { ProductCatalog } from './features/products/ProductCatalog'
@@ -31,6 +32,8 @@ const Losses = lazy(() => import('./features/production/Losses').then(module => 
 const OperationalCatalogs = lazy(() => import('./features/inventory/OperationalCatalogs').then(module => ({ default: module.OperationalCatalogs })))
 const RecipeReview = lazy(() => import('./features/recipes/RecipeReview').then(module => ({ default: module.RecipeReview })))
 const RecipeAssignments = lazy(() => import('./features/recipes/RecipeAssignments').then(module => ({ default: module.RecipeAssignments })))
+const StationTerminal = lazy(() => import('./features/production/StationTerminal').then(module => ({ default: module.StationTerminal })))
+const TvBoard = lazy(() => import('./features/production/TvBoard').then(module => ({ default: module.TvBoard })))
 const ProductionBoard = lazy(() => import('./features/production/ProductionBoard').then(module => ({ default: module.ProductionBoard })))
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const OperationalAlerts = lazy(() => import('./features/alerts/OperationalAlerts'))
@@ -123,7 +126,7 @@ function Workspace({ userId }: { userId: string }) {
       {role && !canNavigate(tab, role) && <ForbiddenState description="Este endereço não existe ou não está disponível para o seu perfil."/>}
       {profile.data && <>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} onNavigate={setTab}
-          quickActions={role && <QuickActions role={role} onAction={runQuick}/>}/></Suspense>}
+          quickActions={role && <><Onboarding role={role}/><QuickActions role={role} onAction={runQuick}/></>}/></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
@@ -174,6 +177,12 @@ function Workspace({ userId }: { userId: string }) {
         </Suspense>}
         {tab === 'shipping' && <Suspense fallback={<p role="status">Abrindo expedição…</p>}>
           <Shipping allowOperations={role !== 'VENDAS'}/>
+        </Suspense>}
+        {tab === 'terminal' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo terminal…</p>}>
+          <StationTerminal canOperate/>
+        </Suspense>}
+        {tab === 'tv' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo modo TV…</p>}>
+          <TvBoard onExit={() => setTab('production-board')}/>
         </Suspense>}
         {tab === 'production-board' && <Suspense fallback={<p role="status">Abrindo quadro…</p>}>
           <ProductionBoard canStart={role !== 'VENDAS'}/>
