@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Recycle, Scale, Settings2, X } from 'lucide-react'
 import { formatStockQuantity } from '../../lib/decimal'
 import { supabase } from '../../lib/supabase'
@@ -9,6 +9,7 @@ import { FilterBar } from '../../ui/filters'
 import { Tabs } from '../../ui/Tabs'
 import { useLossMutation, useLossOptions } from './lossSupport'
 import { StockWasteHistory } from '../inventory/StockWaste'
+import { CatalogLifecycleDialog, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
 
 const operations = {
   PREPARACAO: 'Preparação', BATER_MASSA: 'Bater massa', CILINDROS: 'Cilindros', EMBALAGEM: 'Embalagem', OUTRA: 'Outra operação',
@@ -103,7 +104,40 @@ function ConfigureLosses({ canAuthorize, onClose }: { canAuthorize: boolean; onC
       <div><button disabled={mutation.busy}>Salvar cadastro</button></div>
     </form>
     {mutation.feedback && <p className="ui-message" data-tone={mutation.feedback.error ? 'danger' : 'success'} role={mutation.feedback.error ? 'alert' : 'status'}>{mutation.feedback.text}</p>}
+    <LossOptionList kind={kind} canAuthorize={canAuthorize}/>
   </article>
+}
+
+type LossOption = { id: string; name: string; active: boolean }
+
+/** Lista de motivos ou destinações com inativação, reativação, exclusão segura e histórico. */
+function LossOptionList({ kind, canAuthorize }: { kind: 'MOTIVO' | 'DESTINACAO'; canAuthorize: boolean }) {
+  const cache = useQueryClient()
+  const lifecycle = useLifecycle()
+  const table = kind === 'MOTIVO' ? 'loss_reasons' : 'loss_destinations'
+  const list = useQuery({
+    queryKey: ['losses', 'option-list', table],
+    queryFn: async (): Promise<LossOption[]> => {
+      const { data, error } = await supabase.from(table).select('id,name,active').order('active', { ascending: false }).order('name')
+      if (error) throw error
+      return data
+    },
+  })
+  // Destinações exigem a autorização de liberação de lotes também para inativar ou excluir.
+  const manage = kind === 'MOTIVO' || canAuthorize
+  const columns: Column<LossOption>[] = [
+    { id: 'name', header: kind === 'MOTIVO' ? 'Motivo' : 'Destinação', cell: row => <strong>{row.name}</strong> },
+    { id: 'active', header: 'Situação', cell: row => <Badge tone={row.active ? 'success' : 'neutral'}>{row.active ? 'Ativo' : 'Inativo'}</Badge> },
+  ]
+  return <>
+    <DataTable caption={kind === 'MOTIVO' ? 'Motivos cadastrados' : 'Destinações cadastradas'} rows={list.data} columns={columns}
+      rowKey={row => row.id} loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
+      empty={{ title: 'Nenhum cadastro', description: 'Inclua o primeiro registro no formulário acima.' }}
+      rowActions={manage ? row => <RecordActions label={row.name} actions={lifecycleActions(row.active, mode => lifecycle.open(row.id, mode))}/> : undefined}/>
+    {manage && <CatalogLifecycleDialog entity={kind === 'MOTIVO' ? 'MOTIVO_PERDA' : 'DESTINACAO_PERDA'}
+      recordId={lifecycle.recordId} mode={lifecycle.mode} onClose={lifecycle.close} onModeChange={lifecycle.setMode}
+      onDone={() => { lifecycle.close(); void cache.invalidateQueries({ queryKey: ['losses'] }) }}/>}
+  </>
 }
 
 function ReconcileLoss({ id }: { id: string }) {

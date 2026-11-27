@@ -6,6 +6,8 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 
 **Limite da homologação:** o ambiente de desenvolvimento não alcança o Supabase pela rede. Por isso, as telas foram validadas com dados reais de homologação servidos por mocks, e as regras de banco foram validadas por SQL autenticado com usuários de teste. Em 27/11/2026 o E2E com login real (`e2e/smoke.mjs`, Playwright contra homologação) rodou no computador do usuário: 65 de 68 verificações passaram nos três perfis, no desktop e no celular. Passaram login, abertura de todos os módulos permitidos, bloqueio por perfil, busca sem acento e logout, sem erros de console nem respostas 5xx. As 3 falhas eram o seletor do roteiro para a busca global, já corrigido. A busca em si retornou 7 resultados.
 
+**CRUD universal (V2.0, em andamento):** a matriz e o progresso por entidade estão em [CRUD_MATRIX.md](CRUD_MATRIX.md). Ciclo de vida dos cadastros (prévia de dependências, exclusão segura, inativação com motivo, reativação, histórico, aviso de duplicidade) está HOMOLOGADO e aguarda a migration `20261127001000` em produção, com backup, antes da publicação do front end.
+
 | Tópico e requisito | Estado | Arquivos | Migration | Teste | Evidência | Pendências |
 | --- | --- | --- | --- | --- | --- | --- |
 | 01. Contexto e ambientes | PUBLICADO | README, workflow Pages | V1 001–041; V2 001–008 | Smoke do portal, deploy | Pages publicado a partir da `main` | — |
