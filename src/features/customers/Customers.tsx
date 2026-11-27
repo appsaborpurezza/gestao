@@ -6,6 +6,7 @@ import { normalizeText } from '../../lib/text'
 import { DataTable, type Column, type SortState } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+import { CatalogLifecycleDialog, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
 
 /** Monta um filtro `or` do PostgREST seguro para texto livre. */
 export function customerSearchFilter(term: string) {
@@ -146,7 +147,9 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   </section>
 }
 
-export function Customers({ initialCustomer, onOpen }: { initialCustomer?: string; onOpen?: (id: string | null) => void }) {
+export function Customers({ initialCustomer, onOpen, admin = false }: { initialCustomer?: string; onOpen?: (id: string | null) => void; admin?: boolean }) {
+  const lifecycleCache = useQueryClient()
+  const lifecycle = useLifecycle()
   const [creating, setCreating] = useState(false)
   const editor = creating ? 'new' : initialCustomer ?? null
   const setEditor = (id: string | null) => {
@@ -228,7 +231,11 @@ export function Customers({ initialCustomer, onOpen }: { initialCustomer?: strin
       filtered={activeFilters > 0} onClearFilters={() => update({ term: '', status: 'active', uf: '' })}
       empty={{ title: 'Nenhum cliente cadastrado', description: 'Cadastre o primeiro cliente para lançar pedidos.' }}
       onRowOpen={row => setEditor(row.id)}
-      rowActions={row => <button type="button" className="secondary" onClick={() => setEditor(row.id)}>
-        <Pencil aria-hidden="true" size={16}/>Editar<span className="sr-only"> {row.legal_name}</span></button>}/>
+      rowActions={row => <RecordActions label={row.legal_name} onEdit={() => setEditor(row.id)}
+        actions={admin ? lifecycleActions(row.active, mode => lifecycle.open(row.id, mode)) : []}/>}/>
+    {/* Inativação, exclusão segura e histórico de clientes são exclusivos da Administração. */}
+    {admin && <CatalogLifecycleDialog entity="CLIENTE" recordId={lifecycle.recordId} mode={lifecycle.mode}
+      onClose={lifecycle.close} onModeChange={lifecycle.setMode}
+      onDone={() => { lifecycle.close(); void lifecycleCache.invalidateQueries({ queryKey: ['customers'] }) }}/>}
   </section>
 }

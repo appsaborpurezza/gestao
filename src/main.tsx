@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase'
 import { useHashRoute } from './lib/routes'
 import { canNavigate } from './layouts/navigation'
 import { ErrorState, ForbiddenState, Skeleton } from './ui'
+import { Toaster } from './ui/toast'
 import { RecipeList } from './features/recipes/RecipeList'
 import { ProductCatalog } from './features/products/ProductCatalog'
 import './styles/tokens.css'
@@ -65,7 +66,7 @@ function Workspace({ userId }: { userId: string }) {
     enabled: !!profile.data && tab === 'products',
     queryFn: async () => {
       const request = supabase.from('items')
-        .select('id,original_code,original_description,commercial_description,classification,validation_status,base_unit,unit_version')
+        .select('id,original_code,original_description,commercial_description,classification,validation_status,base_unit,unit_version,active,catalog_version')
         .order('original_code')
       if (target?.module === 'products') request.eq('id', target.record_id)
       const { data, error } = await request
@@ -144,7 +145,7 @@ function Workspace({ userId }: { userId: string }) {
             initialLot={target?.record_id} onOpen={id => navigate({ module: 'inventory', recordId: id })}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
-          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}
+          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id} admin={role === 'ADMINISTRADOR'}
             onOpen={id => navigate({ module: 'customers', recordId: id })}/>
         </Suspense>}
         {tab === 'orders' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo pedidos…</p>}>
@@ -193,4 +194,4 @@ function App() {
   return <Workspace key={session.user.id} userId={session.user.id}/>
 }
 
-createRoot(document.getElementById('root')!).render(<QueryClientProvider client={cache}><App/></QueryClientProvider>)
+createRoot(document.getElementById('root')!).render(<QueryClientProvider client={cache}><App/><Toaster/></QueryClientProvider>)
