@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Clock3, LogOut, Menu, Search, Star, Wifi, WifiOff, X, Zap } from 'lucide-react'
 import { RecordSearch, type RecordMatch } from './RecordSearch'
 import { canNavigate, departments, findEntry, roleLabels, type NavEntry } from './navigation'
-import { actionsFor, pushRecent, toggleDepartment, toggleFavorite, useWorkspacePrefs, type QuickAction } from '../lib/workspace'
+import { actionsFor, pushRecent, setWorkspaceUser, toggleDepartment, toggleFavorite, useWorkspacePrefs, type QuickAction } from '../lib/workspace'
 import { highlightParts, normalizeText } from '../lib/text'
 
 function Marked({ text, term }: { text: string; term: string }) {
@@ -64,6 +64,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onActio
   const [term, setTerm] = useState('')
   const current = findEntry(active)
   const user = accountScope.split(':')[0] ?? 'anon'
+  setWorkspaceUser(user)
   const prefs = useWorkspacePrefs(user)
   const allowed = (id: string) => !!role && canNavigate(id, role)
   const favorite = prefs.favorites.includes(active)

@@ -3,6 +3,8 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { ArrowLeft, FileText, Plus, ShoppingCart } from 'lucide-react'
 import { DataTable, type Column, type SortState } from '../../ui/DataTable'
 import { FilterBar, PeriodFilter, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
+import { SavedViews } from '../../ui/SavedViews'
+import { resolvePeriod } from '../../lib/periods'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
 import { todayInSaoPaulo } from '../../lib/periods'
 import { supabase } from '../../lib/supabase'
@@ -227,6 +229,7 @@ export function Orders({ canRegisterBilling, initialOrder, onOpen, startNew = fa
   const selected = initialOrder ?? ''
   const setSelected = (id: string) => onOpen?.(id || null)
   const [filters, setFilters] = useSessionState('orders', emptyFilters)
+  const weekPeriod = resolvePeriod('week', todayInSaoPaulo())
   const term = useDebouncedValue(filters.term)
   const today = todayInSaoPaulo()
   const update = (patch: Partial<typeof filters>) => setFilters(current => ({ ...current, page: 0, ...patch }))
@@ -348,6 +351,12 @@ export function Orders({ canRegisterBilling, initialOrder, onOpen, startNew = fa
             <FileText aria-hidden="true" size={18}/>Dados do PDF comercial</button>}
           <button type="button" onClick={() => setCreating(true)}><Plus aria-hidden="true" size={18}/>Novo pedido</button>
         </>}/>
+      <SavedViews<typeof emptyFilters> scope="orders" current={{ ...filters, page: 0 }} onApply={next => setFilters({ ...next, page: 0 })} presets={[
+        { id: 'all', label: 'Todos', filters: emptyFilters },
+        { id: 'late', label: 'Atrasados', filters: { ...emptyFilters, status: 'LATE', sort: { column: 'delivery_date', direction: 'asc' } as SortState } },
+        { id: 'week', label: 'Entrega nesta semana', filters: { ...emptyFilters, period: { ...weekPeriod, preset: 'week' }, sort: { column: 'delivery_date', direction: 'asc' } as SortState } },
+        { id: 'drafts', label: 'Rascunhos', filters: { ...emptyFilters, status: 'RASCUNHO' } },
+      ]}/>
       <FilterBar activeCount={activeFilters} onClear={() => setFilters(emptyFilters)} onRefresh={() => void orders.refetch()} refreshing={orders.isFetching}>
         <SearchInput label="Pesquisar por número do pedido ou cliente" value={filters.term} onChange={value => update({ term: value })}/>
         <select aria-label="Situação" value={filters.status} onChange={event => update({ status: event.target.value })}>

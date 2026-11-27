@@ -6,6 +6,7 @@ import { normalizeText } from '../../lib/text'
 import { DataTable, type Column, type SortState } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useDebouncedValue, useSessionState } from '../../ui/filters'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
+import { SavedViews } from '../../ui/SavedViews'
 import { CatalogLifecycleDialog, RecordActions, lifecycleActions, useLifecycle } from '../../ui/records'
 
 /** Monta um filtro `or` do PostgREST seguro para texto livre. */
@@ -147,6 +148,9 @@ function CustomerForm({ customer, onClose }: { customer?: Existing; onClose: () 
   </section>
 }
 
+const customerDefaults = { term: '', status: 'active', uf: '', page: 0, pageSize: 25,
+  sort: { column: 'legal_name', direction: 'asc' } as SortState }
+
 export function Customers({ initialCustomer, onOpen, admin = false, startNew = false }: { initialCustomer?: string; onOpen?: (id: string | null) => void; admin?: boolean; startNew?: boolean }) {
   const lifecycleCache = useQueryClient()
   const lifecycle = useLifecycle()
@@ -156,8 +160,7 @@ export function Customers({ initialCustomer, onOpen, admin = false, startNew = f
     setCreating(id === 'new')
     if (id !== 'new') onOpen?.(id)
   }
-  const [filters, setFilters] = useSessionState('customers', { term: '', status: 'active', uf: '', page: 0, pageSize: 25,
-    sort: { column: 'legal_name', direction: 'asc' } as SortState })
+  const [filters, setFilters] = useSessionState('customers', customerDefaults)
   const term = useDebouncedValue(filters.term)
   const activeFilters = [filters.term, filters.status !== 'active' ? filters.status : '', filters.uf].filter(Boolean).length
   const update = (patch: Partial<typeof filters>) => setFilters(current => ({ ...current, page: 0, ...patch }))
@@ -213,6 +216,11 @@ export function Customers({ initialCustomer, onOpen, admin = false, startNew = f
   return <section>
     <PageHeader icon={Users} title="Clientes" description="Cadastro comercial com CPF/CNPJ validado no servidor."
       actions={<button type="button" onClick={() => setEditor('new')}><Plus aria-hidden="true" size={18}/>Novo cliente</button>}/>
+    <SavedViews<typeof customerDefaults> scope="customers" current={{ ...filters, page: 0 }} onApply={next => setFilters({ ...next, page: 0 })} presets={[
+      { id: 'active', label: 'Clientes ativos', filters: customerDefaults },
+      { id: 'inactive', label: 'Inativos', filters: { ...customerDefaults, status: 'inactive' } },
+      { id: 'recent', label: 'Cadastrados por último', filters: { ...customerDefaults, status: 'all', sort: { column: 'customer_number', direction: 'desc' } } },
+    ]}/>
     <FilterBar activeCount={activeFilters} onClear={() => update({ term: '', status: 'active', uf: '' })}
       onRefresh={() => void list.refetch()} refreshing={list.isFetching}>
       <SearchInput label="Pesquisar por nome, fantasia, documento, cidade ou código" value={filters.term} onChange={value => update({ term: value })}/>

@@ -19,7 +19,7 @@ Data: 27/11/2026. Base: `main` em `65f4768`, mais os PRs abertos #13 (CRUD unive
 | Excluir ou inativar cadastro | Não existia (só caixa "Ativo" no formulário) | Menu ⋮ → ação → confirmação (3 interações), com prévia de vínculos | — |
 | Voltar a uma página frequente | Menu (1–2 cliques, rolagem em perfis com muitos módulos) | Favoritos no topo da sidebar, recentes no Ctrl+K | — |
 | Cadastrar fornecedor durante recebimento | Sair do recebimento, ir a Cadastros, voltar e preencher de novo | "Novo fornecedor" ao lado do seletor: cadastra, seleciona e preserva o preenchimento (Administração) | Sem abandonar o formulário |
-| Consultar pedidos atrasados | Filtros manuais | **Pendente** (visualizações salvas) | 1 clique |
+| Consultar pedidos atrasados | Filtros manuais | 1 clique (visualização "Atrasados") | 1 clique |
 
 ## Problemas encontrados
 
@@ -34,8 +34,8 @@ Data: 27/11/2026. Base: `main` em `65f4768`, mais os PRs abertos #13 (CRUD unive
 | 7 | Formulários de cadastro inline empurravam a tabela; sem aviso ao descartar | Média | Resolvido nos cadastros com `RecordDrawer` |
 | 8 | Mensagens de erro podiam expor texto do banco | Média | Resolvido com `friendlyError` |
 | 9 | Cadastro rápido contextual (fornecedor no recebimento, cliente no pedido) | Média | Parcial: fornecedor e fabricante no recebimento; cliente no pedido pendente |
-| 10 | Visualizações salvas e chips de filtro removíveis | Média | Pendente |
-| 11 | Terminal de produção e modo TV dedicados | Alta | Pendente (Fase D da UX) |
+| 10 | Visualizações salvas e chips de filtro removíveis | Média | Resolvido em Pedidos (Atrasados, Entrega nesta semana, Rascunhos) e Clientes, com visualizações do usuário |
+| 11 | Terminal de produção e modo TV dedicados | Alta | Parcial: Kanban com cartões compactos ou detalhados e Gestão à vista existentes; terminal por estação pendente |
 | 12 | Timeline de atividades reutilizável em pedidos, OPs e lotes | Média | Parcial: histórico de cadastros pronto; demais registros pendentes |
 | 13 | Onboarding e ajuda contextual | Baixa | Pendente |
 
