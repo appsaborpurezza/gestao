@@ -4,7 +4,7 @@ Base da matriz: os 31 tópicos da especificação original e os critérios compl
 
 Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://appsaborpurezza.github.io/gestao/). Produção tem 49 migrations (V1 001–041 e V2 001–008), aplicadas em 27/11/2026 após um backup lógico verificado por MD5. PRs integrados: #1 a #7.
 
-**Limite da homologação:** o ambiente de desenvolvimento não alcança o Supabase pela rede. Por isso, as telas foram validadas com dados reais de homologação servidos por mocks, e as regras de banco foram validadas por SQL autenticado com usuários de teste. O E2E com login real (Playwright contra homologação) ainda depende de uma execução com acesso de rede. Nenhum item está marcado como HOMOLOGADO por esse motivo.
+**Limite da homologação:** o ambiente de desenvolvimento não alcança o Supabase pela rede. Por isso, as telas foram validadas com dados reais de homologação servidos por mocks, e as regras de banco foram validadas por SQL autenticado com usuários de teste. Em 27/11/2026 o E2E com login real (`e2e/smoke.mjs`, Playwright contra homologação) rodou no computador do usuário: 65 de 68 verificações passaram nos três perfis, no desktop e no celular. Passaram login, abertura de todos os módulos permitidos, bloqueio por perfil, busca sem acento e logout, sem erros de console nem respostas 5xx. As 3 falhas eram o seletor do roteiro para a busca global, já corrigido. A busca em si retornou 7 resultados.
 
 | Tópico e requisito | Estado | Arquivos | Migration | Teste | Evidência | Pendências |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ Atualizado em 27/11/2026. Portal de produção: [Sabor Purezza SMART](https://ap
 | 24. Segurança | EM DESENVOLVIMENTO | RLS, RPCs | Todas | Advisor de produção (27/11) | Sem achados novos; `operation_requests` sem policy é intencional | Ativar proteção contra senhas vazadas no painel do Supabase (Auth) |
 | 25. Estados da interface | PUBLICADO | `src/ui` | — | Build | Skeleton, vazio, erro e acesso negado padronizados nos módulos atualizados | Módulos restantes |
 | 26. Acessibilidade | EM DESENVOLVIMENTO | `tokens.css`, `src/ui` | — | Teclado | Contraste AA nos tokens, foco visível, ARIA no Combobox e nas abas | Auditoria WCAG com leitor de tela |
-| 27. Testes automatizados | EM DESENVOLVIMENTO | `tests` | V1 e V2 | 62 testes Vitest/PGlite | Regressão local e migração com unaccent | Playwright autenticado em homologação |
+| 27. Testes automatizados | TESTADO | `tests`, `e2e/smoke.mjs` | V1 e V2 | 62 testes Vitest/PGlite; E2E autenticado com 3 perfis | Regressão local, migração com unaccent e E2E em homologação | Fluxos de escrita no E2E (pedido → OP → expedição) |
 | 28. Metas de performance | EM DESENVOLVIMENTO | Build Vite | — | Build | Logo de login caiu de 1,23 MB para WebP de 320 px | Medição autenticada V1/V2 |
 | 29. Estratégia de execução | PUBLICADO | PRs #1–#8 | V2 001–008 | CI em cada PR | Entregas incrementais | — |
 | 30. Critérios de aceite | EM DESENVOLVIMENTO | Matriz e módulos | V1 e V2 | Regressão parcial | Linhas acima | Checklist autenticado |
