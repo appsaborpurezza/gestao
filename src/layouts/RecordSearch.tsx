@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 
 const categories = [
-  ['products', 'Produtos'], ['customers', 'Clientes'], ['orders', 'Pedidos'], ['recipes', 'Receitas'],
+  ['products', 'Produtos'], ['customers', 'Clientes'], ['orders', 'Pedidos'], ['recipes', 'Receitas'], ['traceability', 'Lotes'],
 ] as const
 export type RecordMatch = { module: typeof categories[number][0]; record_id: string; label: string; reference: string }
 const pageSize = 16

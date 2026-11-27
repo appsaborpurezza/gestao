@@ -199,11 +199,13 @@ A Administração com permissão sanitária específica pode encerrar o recolhim
 Unidades comerciais alternativas, avaliação sanitária de devoluções para eventual reaproveitamento, exportação da rastreabilidade, tratamento de pedidos confirmados, múltiplas apresentações por massada e cancelamento fiscal continuam pendentes.
 ## Modernização V2
 
+A [matriz de conclusão da V2](docs/V2_STATUS.md) acompanha os 31 tópicos originais, suas evidências e as pendências de homologação e publicação.
+
 A branch `feat/v2-modernizacao` parte da referência local `474767a`. O primeiro incremento reorganiza os módulos em uma barra lateral recolhível, com menu em diálogo para telas menores. Use **Buscar módulos** ou **Ctrl+K** para localizar uma tela autorizada. A busca deste incremento abrange nomes de módulos.
 
 O Supabase de produção foi conferido antes da alteração de interface. Foram constatadas 41 migrations, 54 tabelas públicas com RLS, 37 produtos e nove versões de receita. O ambiente Supabase de homologação já existente é `vooyoomskkaivlluioeq`.
 
-A busca por **Ctrl+K** consulta produtos, clientes, pedidos e receitas pela RPC `workspace_search`, além dos módulos disponíveis. Os resultados paginados abrem o registro encontrado. A busca respeita as permissões existentes, não retorna valores comerciais e mantém os termos apenas na memória durante a consulta.
+A busca por **Ctrl+K** consulta produtos, clientes, pedidos e receitas pela RPC `workspace_search`, além dos módulos disponíveis. A migration V2 007 acrescenta lotes para Administração e Produção, pesquisáveis pelo código interno, código original, item ou fabricante. Os resultados paginados abrem o registro encontrado. A busca respeita as permissões existentes, não retorna valores comerciais e mantém os termos apenas na memória durante a consulta.
 
 O login usa o logotipo original e reorganiza o formulário para telas estreitas. As páginas compartilham os estilos de controles, tabelas, foco e painéis. No Kanban, os estados das massadas têm rótulos visíveis e cores correspondentes. Essa atualização é de interface e não requer migrations.
 
@@ -212,5 +214,7 @@ Em **Principal → Central de alertas**, consulte os grupos ativos por severidad
 Em **Administração → Usuários e permissões**, administradores podem vincular contas confirmadas no Supabase Auth e revisar ou alterar perfis existentes. O backend registra as mudanças em auditoria, verifica a versão editada e protege o último administrador ativo. As permissões de aprovar receitas e liberar lotes são independentes. Convites e recuperação ainda usam o Supabase Auth.
 
 O Kanban V2 usa a migration incremental `20261127000100_production_board_columns.sql`. A consulta retorna as seis etapas com totais filtrados e paginação própria. A busca abrange número da OP, pedido, cliente, produto e lote, ignora acentos e cancela requisições obsoletas.
+
+Em **Visualização → Lista da etapa**, o quadro apresenta a página da operação selecionada. **Abrir** mostra os detalhes e as ações autorizadas da massada em um painel lateral. O fechamento do painel preserva a pesquisa e a página da etapa.
 
 As migrations `20261127000200_production_board_realtime.sql` e `20261127000300_production_board_revision.sql` instalam os gatilhos e publicam somente a revisão do quadro via Postgres Changes. A tabela de revisão exige perfil ativo via RLS. O cliente agrupa sinais próximos, consulta somente o quadro ativo e mantém os filtros e a paginação. Quando o canal está indisponível, o quadro consulta a cada 60 segundos com a aba visível. Em **Gestão à vista**, Produção e Administração podem consultar as seis etapas sem ações de edição. Faça backup antes de aplicar as migrations V2 em produção. Para reverter a interface, publique a versão anterior do frontend, que continua usando a RPC original.

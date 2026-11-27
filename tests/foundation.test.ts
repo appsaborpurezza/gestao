@@ -73,6 +73,7 @@ beforeAll(async () => {
     '20261127000400_workspace_search.sql',
     '20261127000500_operational_alerts.sql',
     '20261127000600_manage_profiles.sql',
+    '20261127000700_workspace_lot_search.sql',
   ]) {
     await db.exec(await migration(name))
   }
@@ -1569,6 +1570,12 @@ test('ficha técnica vincula insumos sem substituir a transcrição ou aprovar a
   )).rows
   const finishedCode = codes.find(row=>row.id===finishedLot)!.internal_code
   const ingredientCode = codes.find(row=>row.id===earlyLot)!.internal_code
+  const findLot = (code: string) => db.query("select record_id,reference from public.workspace_search($1) where module='traceability'",[code.toLowerCase()])
+  await asUser(production)
+  expect((await findLot(finishedCode)).rows).toEqual([{record_id:finishedLot,reference:finishedCode}])
+  expect((await findLot(ingredientCode)).rows).toEqual([{record_id:earlyLot,reference:ingredientCode}])
+  await asUser(sales)
+  expect((await findLot(finishedCode)).rows).toEqual([])
   const genealogy = async (code: string) => (await db.query<{
     trace: { production: { batches: unknown[]; inputs: unknown[]; uses: unknown[]; water: unknown[]; destinations: unknown[] } }
   }>('select public.trace_inventory_lot($1) trace',[code])).rows[0]!.trace.production

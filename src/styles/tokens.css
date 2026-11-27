@@ -1,0 +1,98 @@
+/* Design System Sabor Purezza SMART — tokens semânticos (docs/DESIGN_SYSTEM.md). */
+:root {
+  /* Marca */
+  --color-brand-blue: #07558b;
+  --color-brand-navy: #073b61;
+  --color-brand-sky: #1976b9;
+  --color-brand-red: #d51f28;
+  --color-brand-yellow: #f9d000;
+
+  /* Semânticos */
+  --color-primary: var(--color-brand-blue);
+  --color-primary-hover: var(--color-brand-navy);
+  --color-primary-soft: #e6f0f8;
+  --color-secondary: var(--color-brand-sky);
+  --color-accent: var(--color-brand-red);
+  --color-background: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef2f6;
+  --color-text-primary: #172b3d;
+  --color-text-muted: #526478; /* #64748b não atinge 4,5:1 em #f5f7fa para texto pequeno */
+  --color-text-inverse: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-strong: #8196a8;
+  --color-success: #258354;
+  --color-success-soft: #dcfce7;
+  --color-success-ink: #166534;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-warning-ink: #78350f;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-danger-ink: #991b1b;
+  --color-info: var(--color-brand-sky);
+  --color-info-soft: #e0efff;
+  --color-info-ink: #073b61;
+  --color-neutral-soft: #f1f5f9;
+  --color-neutral-ink: #334155;
+  --color-focus: #1976b9;
+  --color-overlay: rgb(7 33 55 / 55%);
+
+  /* Tipografia */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --text-xs: .75rem;
+  --text-sm: .875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: clamp(1.4rem, 2.4vw, 1.875rem);
+  --text-display: clamp(1.6rem, 3.2vw, 2.4rem);
+  --weight-regular: 400;
+  --weight-medium: 550;
+  --weight-semibold: 650;
+  --weight-bold: 750;
+
+  /* Espaçamento (escala de 4 px) */
+  --space-1: .25rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  /* Raios, sombras, alturas */
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(7 59 97 / 6%);
+  --shadow-md: 0 4px 16px rgb(7 59 97 / 7%);
+  --shadow-lg: 0 18px 48px rgb(7 33 55 / 18%);
+  --control-height: 44px; /* área de toque mínima */
+  --control-height-sm: 36px;
+  --header-height: 4rem;
+  --sidebar-width: 16rem;
+  --sidebar-width-collapsed: 4.5rem;
+  --content-max: 1440px;
+
+  /* Camadas */
+  --z-header: 20;
+  --z-sidebar: 15;
+  --z-overlay: 40;
+  --z-toast: 60;
+
+  /* Movimento */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --easing: cubic-bezier(.2, .8, .2, 1);
+
+  /* Breakpoints de referência (usados nas media queries): 600 celular, 900 tablet, 1280 notebook */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; --duration-base: 0ms; }
+  *, *::before, *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+}
