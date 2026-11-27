@@ -46,6 +46,9 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   const request = useRef<string | null>(null)
   const stageRunning = canStart && !batch.recalled && batch.stage_status === 'EM_EXECUCAO'
   const lossOperation = lossOperations[batch.status]
+  const state = batch.recalled ? 'blocked' : batch.stage_status === 'PAUSADA' ? 'paused'
+    : batch.status === 'FINALIZADA' ? 'done' : batch.stage_status === 'EM_EXECUCAO' ? 'running' : 'waiting'
+  const stateLabel = { blocked: 'Bloqueada', paused: 'Pausada', done: 'Finalizada', running: 'Em execução', waiting: 'Aguardando' }[state]
 
   async function start() {
     if (inFlight.current) return
@@ -71,7 +74,8 @@ function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
     }
   }
 
-  return <article className="batch-card">
+  return <article className="batch-card" data-state={state}>
+    <span className="batch-status">{stateLabel}</span>
     <h3>OP {batch.production_number} · Massada {batch.sequence}/{batch.batches_count}</h3>
     <p>Pedido {batch.order_number} · {batch.customer_name}</p>
     <p>{batch.description}</p>

@@ -97,7 +97,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onOpenR
       <strong>Sabor Purezza SMART</strong>
       {role && <button type="button" className="secondary shell-search-control" aria-haspopup="dialog"
         onClick={() => search.current?.showModal()}>Buscar <kbd>Ctrl+K</kbd></button>}
-      <span className="shell-connection" role="status">{online ? 'Rede disponível' : 'Sem conexão'}</span>
+      <span className="shell-connection" data-online={online} role="status">{online ? 'Rede disponível' : 'Sem conexão'}</span>
       {name && <div className="shell-user"><strong>{name}</strong><small>{roleLabels[role ?? '']}</small></div>}
       <button type="button" className="secondary" disabled={signingOut} onClick={async () => {
         setSigningOut(true)

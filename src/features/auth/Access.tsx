@@ -35,10 +35,13 @@ export function Access({ recovery }: { recovery: boolean }) {
   }
 
   return <main className="access">
-    <section className="panel">
-      <img className="logo" src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas"/>
-      <h1>{recovery ? 'Nova senha' : reset ? 'Recuperar senha' : 'Sabor Purezza SMART'}</h1>
-      <form onSubmit={submit}>
+    <div className="access-brand">
+      <img src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas" width={288} height={288} fetchPriority="high"/>
+      <p>Sabor Purezza SMART</p>
+    </div>
+    <section className="panel access-form" aria-labelledby="access-title">
+      <h1 id="access-title">{recovery ? 'Nova senha' : reset ? 'Recuperar senha' : 'Entrar no sistema'}</h1>
+      <form onSubmit={submit} aria-busy={busy}>
         {!recovery && <label>E-mail <input name="email" type="email" autoComplete="username" required/></label>}
         {!reset && <label>{recovery ? 'Nova senha' : 'Senha'}
           <input name="password" type="password" autoComplete={recovery ? 'new-password' : 'current-password'} required/>
@@ -48,7 +51,7 @@ export function Access({ recovery }: { recovery: boolean }) {
       {!recovery && <button className="secondary" disabled={busy} onClick={() => { setReset(!reset); setMessage('') }}>
         {reset ? 'Voltar ao acesso' : 'Esqueci a senha'}
       </button>}
-      {message && <p role={failed ? 'alert' : 'status'}>{message}</p>}
+      {message && <p className="access-feedback" role={failed ? 'alert' : 'status'}>{message}</p>}
     </section>
   </main>
 }
