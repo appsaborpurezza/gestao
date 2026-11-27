@@ -5,8 +5,13 @@ import { Badge, EmptyState, PageHeader } from '../../ui'
 import { FilterBar, SearchInput } from '../../ui/filters'
 
 const Dashboard = lazy(() => import('../dashboard/Dashboard'))
-const reports = [
+type Report = { category: string; title: string; detail: string; module: string; panel?: string; technical?: boolean; commercial?: boolean }
+const reports: Report[] = [
   { category: 'Indicadores', title: 'Indicadores por período', detail: 'Produção, perdas e indicadores comerciais conforme o perfil. Exportação em PDF e Excel.', module: 'dashboard' },
+  { category: 'Produção', title: 'Painel de produção', detail: 'Planejado x realizado, rendimento por receita, produtividade e tempos por etapa. PDF, Excel e impressão.', module: 'panels', panel: 'production', technical: true },
+  { category: 'Estoque', title: 'Painel de estoque', detail: 'Saldo atual por situação, classificação e validade. PDF, Excel e impressão.', module: 'panels', panel: 'stock', technical: true },
+  { category: 'Qualidade', title: 'Painel de qualidade', detail: 'Perdas por motivo, destino e operação, peso abaixo do nominal e recolhimentos. PDF, Excel e impressão.', module: 'panels', panel: 'quality', technical: true },
+  { category: 'Comercial', title: 'Painel comercial', detail: 'Pedidos, expedições e faturamento por cliente. PDF, Excel e impressão.', module: 'panels', panel: 'commercial', commercial: true },
   { category: 'Estoque', title: 'Posição e movimentações de estoque', detail: 'Consulte a posição por data, os lotes e as movimentações. A posição histórica pode ser exportada.', module: 'inventory' },
   { category: 'Comercial', title: 'Pedidos e faturamento', detail: 'Consulte pedidos e o faturamento registrado. Vendas pode emitir o documento comercial.', module: 'orders' },
   { category: 'Comercial', title: 'Expedições e entregas', detail: 'Consulte o histórico de expedições, comprovações e devoluções.', module: 'shipping' },
@@ -22,7 +27,16 @@ export default function ReportCenter({ role, accountScope, onNavigate }: {
   const [term, setTerm] = useState('')
   const [category, setCategory] = useState('')
   const [preview, setPreview] = useState(false)
-  const allowed = reports.filter(report => canNavigate(report.module, role))
+  const allowed = reports.filter(report => canNavigate(report.module, role)
+    && !(report.technical && role === 'VENDAS') && !(report.commercial && role === 'PRODUCAO'))
+  const openPanel = (panel: string) => {
+    const key = 'purezza:filters:panels:' + accountScope
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) ?? '{}') as Record<string, unknown>
+      sessionStorage.setItem(key, JSON.stringify({ ...saved, panel }))
+    } catch { /* armazenamento indisponível: abre no primeiro painel */ }
+    onNavigate('panels')
+  }
   const categories = [...new Set(allowed.map(report => report.category))]
   const needle = searchKey(term.trim())
   const visible = allowed.filter(report => (!category || report.category === category)
@@ -44,14 +58,15 @@ export default function ReportCenter({ role, accountScope, onNavigate }: {
     </FilterBar>
     {!visible.length && <EmptyState icon={SearchX} title="Nenhum relatório encontrado" description="Ajuste a busca ou a categoria."/>}
     <ul className="report-center">
-      {visible.map(report => <li key={report.module}>
+      {visible.map(report => <li key={report.title}>
         <Badge tone="info">{report.category}</Badge>
         <h2>{report.title}</h2>
         <p>{report.detail}</p>
         <button type="button" className="secondary" onClick={() => {
           if (report.module === 'dashboard') setPreview(true)
+          else if (report.panel) openPanel(report.panel)
           else onNavigate(report.module)
-        }}>{report.module === 'dashboard' ? 'Visualizar relatório' : 'Abrir consulta'}<span className="sr-only"> {report.title}</span></button>
+        }}>{report.module === 'dashboard' || report.panel ? 'Visualizar relatório' : 'Abrir consulta'}<span className="sr-only"> {report.title}</span></button>
       </li>)}
     </ul>
   </section>

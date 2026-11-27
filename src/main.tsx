@@ -38,6 +38,7 @@ const ProductionBoard = lazy(() => import('./features/production/ProductionBoard
 const Dashboard = lazy(() => import('./features/dashboard/Dashboard'))
 const OperationalAlerts = lazy(() => import('./features/alerts/OperationalAlerts'))
 const ReportCenter = lazy(() => import('./features/reports/ReportCenter'))
+const DepartmentPanels = lazy(() => import('./features/panels/DepartmentPanels'))
 const ProfileManagement = lazy(() => import('./features/administration/ProfileManagement'))
 
 const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
@@ -129,6 +130,9 @@ function Workspace({ userId }: { userId: string }) {
           quickActions={role && <><Onboarding role={role}/><QuickActions role={role} onAction={runQuick}/></>}/></Suspense>}
         {tab === 'alerts' && <Suspense fallback={<p role="status">Abrindo alertas…</p>}>
           <OperationalAlerts accountScope={`${userId}:${role}`} onNavigate={setTab}/>
+        </Suspense>}
+        {tab === 'panels' && role && <Suspense fallback={<p role="status">Abrindo painéis…</p>}>
+          <DepartmentPanels key={`${userId}:${role}`} accessKey={`${userId}:${role}`} onNavigate={setTab}/>
         </Suspense>}
         {tab === 'reports' && role && <Suspense fallback={<p role="status">Abrindo relatórios…</p>}>
           <ReportCenter role={role} accountScope={`${userId}:${role}`} onNavigate={setTab}/>
