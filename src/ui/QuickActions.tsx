@@ -1,11 +1,11 @@
-import { ClipboardPlus, Factory, PackagePlus, PackageSearch, Recycle, ShoppingCart, Truck, UserCog, UserPlus, Workflow, type LucideIcon } from 'lucide-react'
+import { Tablet, ClipboardPlus, Factory, PackagePlus, PackageSearch, Recycle, ShoppingCart, Truck, UserCog, UserPlus, Workflow, type LucideIcon } from 'lucide-react'
 import { canNavigate } from '../layouts/navigation'
 import { actionsFor, type QuickAction } from '../lib/workspace'
 
 const icons: Record<string, LucideIcon> = {
   'orders:novo': ShoppingCart, 'customers:novo': UserPlus, 'production-board': Workflow, 'inventory:receber': PackagePlus,
   traceability: PackageSearch, 'losses:registrar': Recycle, 'products:novo': ClipboardPlus, 'operational-catalog:novo': Factory,
-  orders: ShoppingCart, shipping: Truck, profiles: UserCog,
+  orders: ShoppingCart, shipping: Truck, profiles: UserCog, terminal: Tablet,
 }
 
 /** Atalhos do perfil para as tarefas mais frequentes. Só aparecem ações autorizadas. */

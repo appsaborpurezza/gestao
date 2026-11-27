@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, Clock3, LogOut, Menu, Search, Star, Wifi, WifiOff, X, Zap } from 'lucide-react'
+import { HelpCircle, Bell, ChevronDown, ChevronsLeft, ChevronsRight, Clock3, LogOut, Menu, Search, Star, Wifi, WifiOff, X, Zap } from 'lucide-react'
 import { RecordSearch, type RecordMatch } from './RecordSearch'
 import { canNavigate, departments, findEntry, roleLabels, type NavEntry } from './navigation'
 import { actionsFor, pushRecent, setWorkspaceUser, toggleDepartment, toggleFavorite, useWorkspacePrefs, type QuickAction } from '../lib/workspace'
 import { highlightParts, normalizeText } from '../lib/text'
+import { HelpCenter, openHelp } from '../ui/Help'
 
 function Marked({ text, term }: { text: string; term: string }) {
   return <>{highlightParts(text, term).map((part, index) => part.match ? <mark key={index}>{part.text}</mark> : <span key={index}>{part.text}</span>)}</>
@@ -208,6 +209,9 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onActio
         </button>
         {userMenu && <div className="shell-user-menu" role="menu">
           <p><strong>{name ?? 'Conta'}</strong><br/><small>{roleLabels[role ?? ''] ?? 'Sem perfil ativo'}</small></p>
+          <button type="button" role="menuitem" onClick={() => { setUserMenu(false); openHelp() }}>
+            <HelpCircle aria-hidden="true" size={16}/>Dicas e ajuda
+          </button>
           <button type="button" role="menuitem" disabled={signingOut} onClick={() => void signOut()}>
             <LogOut aria-hidden="true" size={16}/>{signingOut ? 'Saindo…' : 'Sair'}
           </button>
@@ -259,6 +263,7 @@ export function AppShell({ active, name, role, accountScope, onNavigate, onActio
       }}/>}
     </dialog>
 
+    <HelpCenter role={role}/>
     <main id="conteudo" tabIndex={-1} className="shell-content">
       {signOutError && <p role="alert">Falha ao sair. Tente novamente.</p>}
       {children}

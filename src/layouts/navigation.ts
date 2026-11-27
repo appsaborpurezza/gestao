@@ -1,6 +1,6 @@
 import {
   AlertTriangle, BarChart3, Boxes, ClipboardList, Factory, FileBarChart, FlaskConical, Gauge, Link2, PackageSearch,
-  Recycle, Settings2, ShieldAlert, ShoppingCart, Tags, Truck, Upload, UserCog, Users, Workflow, type LucideIcon,
+  Recycle, Settings2, ShieldAlert, ShoppingCart, Tablet, Tags, Truck, Tv, Upload, UserCog, Users, Workflow, type LucideIcon,
 } from 'lucide-react'
 
 export type Role = 'ADMINISTRADOR' | 'VENDAS' | 'PRODUCAO'
@@ -20,6 +20,8 @@ export const departments: Department[] = [
   { label: 'Produção', entries: [
     { id: 'production-demand', title: 'Demanda de produção', icon: ClipboardList },
     { id: 'production-board', title: 'Kanban de produção', icon: Workflow },
+    { id: 'terminal', title: 'Terminal da estação', icon: Tablet },
+    { id: 'tv', title: 'Modo TV', icon: Tv },
     { id: 'recipes', title: 'Receitas', icon: FlaskConical },
   ] },
   { label: 'Estoque', entries: [
@@ -50,7 +52,7 @@ export const departments: Department[] = [
 export const fallbackIcon = BarChart3
 export const settingsIcon = Settings2
 
-const operational = new Set(['production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
+const operational = new Set(['terminal', 'tv', 'production-demand', 'recipes', 'inventory', 'traceability', 'recall', 'losses'])
 const commercial = new Set(['orders', 'customers'])
 const administrative = new Set(['operational-catalog', 'recipe-assignments', 'import', 'profiles'])
 const shared = new Set(['dashboard', 'alerts', 'reports', 'products', 'production-board', 'shipping'])

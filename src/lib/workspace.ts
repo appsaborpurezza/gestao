@@ -63,6 +63,7 @@ export type QuickAction = { id: string; module: string; action?: RouteAction; ti
 export const quickActions: QuickAction[] = [
   { id: 'orders:novo', module: 'orders', action: 'novo', title: 'Novo pedido', hint: 'Abrir formulário de pedido', roles: ['ADMINISTRADOR', 'VENDAS'] },
   { id: 'customers:novo', module: 'customers', action: 'novo', title: 'Novo cliente', hint: 'Cadastrar cliente', roles: ['ADMINISTRADOR', 'VENDAS'] },
+  { id: 'terminal', module: 'terminal', title: 'Terminal da estação', hint: 'Fila da minha estação', roles: ['PRODUCAO'] },
   { id: 'production-board', module: 'production-board', title: 'Abrir Kanban', hint: 'Kanban de produção', roles: ['ADMINISTRADOR', 'PRODUCAO', 'VENDAS'] },
   { id: 'inventory:receber', module: 'inventory', action: 'receber', title: 'Receber material', hint: 'Registrar recebimento', roles: ['ADMINISTRADOR', 'PRODUCAO'] },
   { id: 'traceability', module: 'traceability', title: 'Consultar lote', hint: 'Rastreabilidade por código', roles: ['ADMINISTRADOR', 'PRODUCAO'] },

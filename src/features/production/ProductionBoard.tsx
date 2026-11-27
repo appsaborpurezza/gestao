@@ -15,7 +15,7 @@ import { DataTable, type Column } from '../../ui/DataTable'
 import { todayInSaoPaulo } from '../../lib/periods'
 import { batchDeadline, stateTones } from './boardState'
 
-const columns = [
+export const columns = [
   ['PLANEJADA', 'Pedidos'],
   ['EM_PREPARACAO', 'Preparação (pesagem dos ingredientes)'],
   ['EM_BATER_MASSA', 'Bater massa'],
@@ -24,7 +24,7 @@ const columns = [
   ['FINALIZADA', 'Finalizado'],
 ] as const
 const pageSize = 8
-type Stage = typeof columns[number][0]
+export type Stage = typeof columns[number][0]
 const lossOperations: Record<string, Exclude<LossOperation, 'OUTRA'>> = {
   EM_PREPARACAO: 'PREPARACAO', EM_BATER_MASSA: 'BATER_MASSA', EM_CILINDROS: 'CILINDROS', EM_EMBALAGEM: 'EMBALAGEM',
 }
@@ -32,7 +32,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short',
 })
 
-type Batch = {
+export type Batch = {
   id: string; sequence: number; status: string; version: number; lot_code: string | null
   started_at: string | null; stage_started_at: string | null; operator: string | null; production_number: number; batches_count: number
   output_code: string | null
@@ -48,7 +48,7 @@ export function batchState(batch: Pick<Batch, 'recalled' | 'stage_status' | 'sta
   return batch.stage_status === 'EM_EXECUCAO' ? 'running' : 'waiting'
 }
 
-function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
+export function BatchCard({ batch, canStart }: { batch: Batch; canStart: boolean }) {
   const cache = useQueryClient()
   const [review, setReview] = useState(false)
   const [busy, setBusy] = useState(false)
