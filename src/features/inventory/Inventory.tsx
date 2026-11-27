@@ -10,6 +10,7 @@ import { StockWasteDetails } from './StockWaste'
 import { Badge, ErrorState, PageHeader, Skeleton } from '../../ui'
 import { Tabs } from '../../ui/Tabs'
 import { Combobox } from '../../ui/Combobox'
+import { QuickCreate } from '../../ui/records'
 import { DataTable, type Column } from '../../ui/DataTable'
 import { FilterBar, SearchInput, useSessionState } from '../../ui/filters'
 import { formatDate, matchesTerm } from '../../lib/text'
@@ -192,10 +193,18 @@ export function Inventory({ admin, release, initialLot, onOpen, startReceive = f
         <form className="ui-form" onSubmit={receive} key={view}>
           <fieldset className="ui-fieldset"><legend>Item e origem</legend>
             <Combobox label="Item" name="item_id" required value={itemId} onChange={setItemId} options={itemOptions}/>
-            {!opening && <Combobox label="Fornecedor" name="supplier_id" required value={supplierId} onChange={setSupplierId}
-              options={data.data.suppliers.map(row => ({ value: row.id, label: row.name }))}/>}
-            <Combobox label="Fabricante" name="manufacturer_id" required value={manufacturerId} onChange={setManufacturerId}
-              options={data.data.manufacturers.map(row => ({ value: row.id, label: row.name }))}/>
+            {!opening && <div className="ui-field-with-action">
+              <Combobox label="Fornecedor" name="supplier_id" required value={supplierId} onChange={setSupplierId}
+                options={data.data.suppliers.map(row => ({ value: row.id, label: row.name }))}/>
+              {admin && <QuickCreate entity="FORNECEDOR" catalog="FORNECEDOR" label="Novo fornecedor"
+                onCreated={async id => { await data.refetch(); setSupplierId(id) }}/>}
+            </div>}
+            <div className="ui-field-with-action">
+              <Combobox label="Fabricante" name="manufacturer_id" required value={manufacturerId} onChange={setManufacturerId}
+                options={data.data.manufacturers.map(row => ({ value: row.id, label: row.name }))}/>
+              {admin && <QuickCreate entity="FABRICANTE" catalog="FABRICANTE" label="Novo fabricante"
+                onCreated={async id => { await data.refetch(); setManufacturerId(id) }}/>}
+            </div>
             <label>Localização <select name="location_id" required><option value="">Selecione</option>{data.data.locations.map(row => <option key={row.id} value={row.id}>{row.code}</option>)}</select></label>
           </fieldset>
           <fieldset className="ui-fieldset"><legend>Lote e quantidade</legend>

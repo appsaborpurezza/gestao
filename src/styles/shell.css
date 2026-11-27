@@ -752,3 +752,6 @@ nav .shell-department[aria-expanded=false] svg { transform: rotate(-90deg); }
 .ui-quick-actions button:hover:not(:disabled) { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
 .ui-quick-actions button svg { color: var(--color-primary); }
 @media (prefers-reduced-motion: reduce) { nav .shell-department svg { transition: none; } }
+.ui-field-with-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2); align-items: end; }
+.ui-quick-create { white-space: nowrap; }
+@media (max-width: 520px) { .ui-field-with-action { grid-template-columns: minmax(0, 1fr); } }
