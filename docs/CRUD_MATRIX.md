@@ -25,12 +25,12 @@ A estrutura abaixo foi lida do PostgreSQL de homologação (`information_schema`
 | Locais de estoque | `locations` | Sim | Sim | Sim | Sim, se nunca usado | Sim, bloqueia com saldo ou sessão aberta | Sim | PUBLICADO |
 | Motivos de perda | `loss_reasons` | Sim | Sim | Não | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
 | Destinações de perda | `loss_destinations` | Sim (exige liberação sanitária) | Sim | Não | Sim, se nunca usada | Sim, com motivo | Sim | PUBLICADO |
-| Receitas | `recipes` | Não | Sim | Não | Não | Não existe situação | — | PENDENTE |
-| Versões de receita | `recipe_versions` + `recipe_reviews` | Não | Sim | Sim, revisão técnica de versão pendente | Não | — | — | PUBLICADO parcial (revisar e aprovar) |
+| Receitas | `recipes` | Sim (`create_recipe`) e Duplicar (`duplicate_recipe`) | Sim | Por nova versão | Sim, rascunho único nunca usado (`delete_draft_recipe`) | Não existe situação (encerramento pela associação) | — | IMPLEMENTADO (homologação) |
+| Versões de receita | `recipe_versions` + `recipe_reviews` | Sim, nova versão a partir da aprovada (`create_recipe_version`) | Sim | Sim, revisão técnica de versão pendente | Sim, versão pendente sem uso | — | — | IMPLEMENTADO (homologação); aprovação já PUBLICADA |
 | Associações produto/cliente/receita | `customer_product_recipes` | Sim | Sim | Substituir | Não | Encerrar vigência | — | PUBLICADO (modelo de vigência, sem exclusão) |
-| Configurações de embalagem | `product_packaging_configs` | Sim, nova versão | Sim | Nova versão | Não | — | — | PUBLICADO (versionado) |
+| Configurações de embalagem | `product_packaging_configs` | Sim, nova versão | Sim, todas as versões | Nova versão | Sim, versão nunca usada em OP, reserva ou saída | — | — | IMPLEMENTADO (homologação) |
 | Conversões de unidade | `item_unit_conversions` | Sim, nova versão | Sim | Nova versão | Não | — | — | PUBLICADO (versionado) |
-| Usuários e perfis | `profiles` + Auth | Vincular conta já criada | Sim | Perfil, permissões, ativo | Não (correto) | Sim | Sim | PUBLICADO parcial: falta convite, reenvio, revogação e senha |
+| Usuários e perfis | `profiles` + Auth | Convite pela Edge Function `admin-users` e vínculo de conta | Sim | Perfil, permissões, ativo | Não (correto); só revogar convite nunca aceito | Sim | Sim | IMPLEMENTADO (Edge Function publicada só em homologação) |
 | Documento comercial (configuração) | `commercial_document_settings` | Configurar | Sim | Sim | — | — | — | PUBLICADO |
 | Categorias, unidades, classificações, etapas | `CHECK` nas tabelas | Fixas | — | — | — | — | — | Estruturais, mantidas fixas (ver seção própria) |
 
@@ -42,6 +42,53 @@ Registros transacionais não entram no CRUD de exclusão: pedidos, OPs, massadas
 - **Fases C e D (telas)**: componentes `RecordActions`, `Modal`, `RecordDrawer`, `CatalogLifecycleDialog`, `SimilarRecords` e avisos (`toast`). Aplicados em Cadastros operacionais (fornecedores, fabricantes, locais, insumos), Produtos (novo, editar, duplicar), Clientes (ciclo de vida só para Administração) e Motivos e destinações de perda.
 - **Testes**: Vitest 71 (70 passam, 1 ignorado); 64 verificações de tela com respostas simuladas em notebook, tablet e celular, para os perfis Administração e Vendas. O ambiente de desenvolvimento não alcança o Supabase pela rede, então o login real não pôde ser exercitado daqui.
 - **Pendente**: receitas (decisão de modelagem para "descontinuar"), usuários via Edge Function, aplicação em produção com backup.
+
+## Segunda rodada: espec "CRUD universal, gestão de cadastros e UX inteligente" (27/11/2026, tarde)
+
+A espec repete em grande parte a primeira e foi comparada item a item com o que já estava em produção.
+
+| Item da espec | Situação antes | O que entrou agora |
+| --- | --- | --- |
+| 2, 31. Auditoria e matriz | Feita (este documento) | Matriz atualizada |
+| 4, 6, 10 a 15. Menu de ações, prévia, exclusão segura, inativação, reativação, histórico | PUBLICADO (PRs #13 e #14) | Estendido a versões de receita e de embalagem |
+| 5, 7. Padrão de página e gaveta com aviso de alterações | PUBLICADO | Usuários migrado para o padrão (PageHeader, filtros, DataTable, gaveta). Clientes deixou de usar `confirm()` do navegador |
+| 7. "Salvar e cadastrar outro" | Faltava | Cadastros operacionais, Produtos e Clientes |
+| 8, 9. Produto completo e edição com restrições explicadas | PUBLICADO | Sem mudança |
+| 16. Receitas: nova, nova versão, duplicar, excluir rascunho | Faltava | Migration `20261127001100_recipe_authoring.sql` e tela |
+| 16. Embalagens: preservar congeladas, excluir não usadas | Parcial | Lista de versões com vigente e exclusão segura |
+| 16. Usuários: convite e operações do Auth no backend | BLOQUEADO | Edge Function `admin-users` (convidar, reenviar, revogar convite pendente, redefinir senha) |
+| 18. Autocomplete com teclado e sem acento | PUBLICADO (`Combobox`) | Usado também nos ingredientes da nova receita |
+| 19. Cadastro rápido contextual | Fornecedor e fabricante no recebimento | Cliente dentro do pedido e insumo dentro da receita, preservando o que já foi preenchido |
+| 20. Duplicidade antes de gravar | Produtos e operacionais | Clientes por nome ou CPF/CNPJ, com "Abrir cadastro" |
+| 21. Duplicação | Produto | Receita (sem aprovação, estoque ou associação) |
+| 22. Filtros | PUBLICADO | Usuários ganhou busca e situação |
+| 23. Ações em massa | Faltava | Exportar, inativar e reativar selecionados, com resultado por registro e sem exclusão em massa |
+| 24. Avisos padronizados | PUBLICADO | Novos fluxos usam `toast` e mensagens do servidor |
+| 28. Segurança | PUBLICADO | Chave secreta só na Edge Function; RPCs novas com papel, versão, idempotência e auditoria |
+
+### Receitas (migration `20261127001100_recipe_authoring.sql`)
+
+- `create_recipe(input, request_id)`: código único (sem diferenciar maiúsculas, com trava), nome, rendimentos em ordem crescente e de 1 a 80 ingredientes. Cada ingrediente é um insumo ativo (nome e unidade vêm do cadastro) ou um nome livre com unidade. Nasce `PENDENTE_VALIDACAO`, versão 1.
+- `create_recipe_version(source_version, request_id)`: só a partir de versão aprovada e se não houver outra em elaboração. Copia os ingredientes revisados e a ficha técnica como rascunho (a referência da revisão fica em branco). A versão aprovada continua intacta e válida.
+- `duplicate_recipe(source_version, {code, name}, request_id)`: nova receita com a cópia da versão escolhida. Nunca copia aprovação, associações, reservas ou lotes.
+- `delete_draft_recipe(target_version, reason, request_id)`: exclui a receita só quando a única versão está pendente e sem nenhum vínculo, revalidando com as linhas travadas. Exige Administração com permissão de aprovação técnica e grava `EXCLUIR_CADASTRO` com código e nome.
+- Criar, versionar e duplicar exigem Administração, como a revisão técnica. Tudo é idempotente por `request_id` e auditado.
+- Testes PGlite: `tests/recipeAuthoring.test.ts` (4 testes: criação, idempotência, duplicidade, perfis, cópia sem aprovação, imutabilidade da aprovada, exclusão só de rascunho).
+
+### Usuários (Edge Function `supabase/functions/admin-users`)
+
+- Ações: `invite`, `resend`, `revoke`, `reset_password`. A função valida o token de quem chama no Auth e exige perfil ADMINISTRADOR ativo. A chave secreta é a variável `SUPABASE_SERVICE_ROLE_KEY` do próprio Supabase e nunca vai ao navegador.
+- O convite cria o perfil com o papel escolhido (sem permissões especiais). Se o perfil falhar, o convite é desfeito.
+- Revogar só vale para conta que nunca entrou e não tem nenhuma operação; contas usadas são desativadas, nunca apagadas.
+- Cada ação grava `audit_logs` (`CONVIDAR_USUARIO`, `REENVIAR_CONVITE`, `REVOGAR_CONVITE`, `ENVIAR_REDEFINICAO_SENHA`).
+- O link do convite abre a tela "Definir nova senha" do portal.
+- Configuração no Supabase de produção antes de publicar: o endereço do portal precisa estar em Auth › URL Configuration › Redirect URLs, e o envio de e-mails do Auth precisa de SMTP próprio para volume real (o SMTP padrão do Supabase tem limite baixo).
+
+### Testes desta rodada
+
+- Vitest: 78 testes (77 passam, 1 ignorado), incluindo os 4 novos de receitas.
+- Telas com respostas simuladas nas 5 resoluções da espec (1920×1080, 1366×768, 1024×768, 800×1280 e 390×844): receitas, insumo rápido, ações em massa com falha parcial, salvar e cadastrar outro, cliente rápido no pedido, convite e revogação bloqueada, edição de perfil e versões de embalagem. Capturas em `v2-crud/capturas-rodada2`.
+- Pendente: aplicar a migration na homologação e validar por SQL autenticado; testar a Edge Function com login real (o ambiente de desenvolvimento não alcança o Supabase pela rede).
 
 ## Detalhe por entidade
 

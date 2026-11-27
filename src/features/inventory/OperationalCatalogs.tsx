@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { BulkActions, useRowSelection } from '../../ui/BulkActions'
 import { Factory, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useIdempotentRpc, type CatalogEntity } from '../../lib/catalog'
@@ -36,10 +37,14 @@ function CatalogForm({ catalog, entry, onDirty, onSaved }: {
   const { run, busy } = useIdempotentRpc()
   const [error, setError] = useState('')
   const [label, setLabel] = useState(entry?.label ?? '')
+  const again = useRef(false)
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const data = new FormData(event.currentTarget)
+    const formElement = event.currentTarget
+    const another = again.current
+    again.current = false
+    const data = new FormData(formElement)
     // A situação muda pelo menu (Inativar/Reativar), que exige motivo e confere vínculos.
     const input = { label: String(data.get('label') ?? '').trim(), code: data.get('code'), unit: data.get('unit'), active: entry?.active ?? true }
     setError('')
@@ -48,6 +53,15 @@ function CatalogForm({ catalog, entry, onDirty, onSaved }: {
         catalog, target: entry?.id ?? null, expected_version: entry?.version ?? null, input,
       }, 'Falha ao salvar o cadastro.')
       await invalidateCatalogs(cache)
+      if (another) {
+        // Salvar e cadastrar outro: limpa o formulário e mantém o painel aberto.
+        toast('Cadastro incluído. Preencha o próximo.')
+        formElement.reset()
+        setLabel('')
+        onDirty(false)
+        formElement.querySelector<HTMLInputElement>('input')?.focus()
+        return
+      }
       toast(entry ? 'Cadastro atualizado.' : 'Cadastro incluído.')
       onSaved()
     } catch (cause) {
@@ -76,6 +90,7 @@ function CatalogForm({ catalog, entry, onDirty, onSaved }: {
     </fieldset>
     {error && <p className="ui-message" data-tone="danger" role="alert">{error}</p>}
     <div className="ui-modal-actions">
+      {!entry && <button className="secondary" disabled={busy} onClick={() => { again.current = true }}>Salvar e cadastrar outro</button>}
       <button disabled={busy}>{busy ? 'Salvando…' : entry ? 'Salvar alterações' : 'Incluir cadastro'}</button>
     </div>
   </form>
@@ -129,6 +144,7 @@ export function OperationalCatalogs({ startNew = false }: { startNew?: boolean }
     },
   })
   const stale = list.isPlaceholderData
+  const selection = useRowSelection<Row>(row => row.id, list.data?.rows)
   const filters = (term ? 1 : 0) + (status !== 'TODOS' ? 1 : 0)
   const openEditor = (row: Row | null) => { setDirty(false); setEditor(row) }
   const columns: Column<Row>[] = [
@@ -142,7 +158,7 @@ export function OperationalCatalogs({ startNew = false }: { startNew?: boolean }
     <PageHeader icon={Factory} title="Cadastros operacionais"
       description="Fornecedores, fabricantes, locais de estoque e insumos usados no recebimento e na produção."
       actions={<button type="button" onClick={() => openEditor(null)}><Plus aria-hidden="true" size={16}/>Novo {catalogs[catalog].singular}</button>}/>
-    <Tabs label="Tipos de cadastro" value={catalog} onChange={key => { setCatalog(key); setPage(0); setEditor(undefined); setSearch('') }}
+    <Tabs label="Tipos de cadastro" value={catalog} onChange={key => { setCatalog(key); setPage(0); setEditor(undefined); setSearch(''); selection.clear() }}
       items={(Object.keys(catalogs) as Catalog[]).map(key => ({ id: key, label: catalogs[key].title }))}/>
     <FilterBar activeCount={filters} onClear={() => { setSearch(''); setStatus('TODOS'); setPage(0) }}
       onRefresh={() => void list.refetch()} refreshing={list.isFetching}>
@@ -153,7 +169,13 @@ export function OperationalCatalogs({ startNew = false }: { startNew?: boolean }
         </select>
       </label>
     </FilterBar>
+    <BulkActions entity={catalog} canChange filename={'cadastros-' + catalog.toLowerCase() + '.csv'} onClear={selection.clear}
+      onDone={() => void invalidateCatalogs(cache)}
+      rows={selection.rows.map(row => ({ id: row.id, label: row.label, active: row.active, cells: {
+        ...(catalog === 'INSUMO' ? { 'Código': row.code ?? '' } : {}), [catalogs[catalog].label]: row.label,
+        ...(catalog === 'INSUMO' ? { Unidade: row.unit ?? '' } : {}), 'Situação': row.active ? 'Ativo' : 'Inativo' } }))}/>
     <DataTable caption={catalogs[catalog].title} rows={stale ? undefined : list.data?.rows} columns={columns} rowKey={row => row.id}
+      selection={{ selected: selection.selected, onChange: selection.onChange, rowLabel: row => row.label }}
       loading={list.isFetching} error={list.isError} onRetry={() => void list.refetch()}
       total={list.data?.count ?? 0} page={page} pageSize={pageSize} onPageChange={setPage}
       onPageSizeChange={size => { setPageSize(size); setPage(0) }}
