@@ -17,14 +17,14 @@ A estrutura abaixo foi lida do PostgreSQL de homologação (`information_schema`
 
 | Entidade | Tabela | Incluir | Consultar | Editar | Excluir | Inativar | Reativar | Situação |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Clientes | `customers` | Sim | Sim | Sim | Sim, se nunca usado (Administração) | Sim, com motivo (Administração) | Sim | HOMOLOGADO (aguarda produção) |
-| Produtos (acabados, terceiros, revenda) | `items` | Sim (`save_item`) e Duplicar | Sim | Descrição comercial e classificação | Sim, se nunca usado | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
-| Insumos e embalagens | `items` (`INSUMO`) | Sim | Sim | Descrição comercial | Sim, se nunca usado | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
-| Fornecedores | `suppliers` | Sim | Sim | Sim | Sim, se nunca usado | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
-| Fabricantes | `manufacturers` | Sim | Sim | Sim | Sim, se nunca usado | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
-| Locais de estoque | `locations` | Sim | Sim | Sim | Sim, se nunca usado | Sim, bloqueia com saldo ou sessão aberta | Sim | HOMOLOGADO (aguarda produção) |
-| Motivos de perda | `loss_reasons` | Sim | Sim | Não | Sim, se nunca usado | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
-| Destinações de perda | `loss_destinations` | Sim (exige liberação sanitária) | Sim | Não | Sim, se nunca usada | Sim, com motivo | Sim | HOMOLOGADO (aguarda produção) |
+| Clientes | `customers` | Sim | Sim | Sim | Sim, se nunca usado (Administração) | Sim, com motivo (Administração) | Sim | PUBLICADO |
+| Produtos (acabados, terceiros, revenda) | `items` | Sim (`save_item`) e Duplicar | Sim | Descrição comercial e classificação | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
+| Insumos e embalagens | `items` (`INSUMO`) | Sim | Sim | Descrição comercial | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
+| Fornecedores | `suppliers` | Sim | Sim | Sim | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
+| Fabricantes | `manufacturers` | Sim | Sim | Sim | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
+| Locais de estoque | `locations` | Sim | Sim | Sim | Sim, se nunca usado | Sim, bloqueia com saldo ou sessão aberta | Sim | PUBLICADO |
+| Motivos de perda | `loss_reasons` | Sim | Sim | Não | Sim, se nunca usado | Sim, com motivo | Sim | PUBLICADO |
+| Destinações de perda | `loss_destinations` | Sim (exige liberação sanitária) | Sim | Não | Sim, se nunca usada | Sim, com motivo | Sim | PUBLICADO |
 | Receitas | `recipes` | Não | Sim | Não | Não | Não existe situação | — | PENDENTE |
 | Versões de receita | `recipe_versions` + `recipe_reviews` | Não | Sim | Sim, revisão técnica de versão pendente | Não | — | — | PUBLICADO parcial (revisar e aprovar) |
 | Associações produto/cliente/receita | `customer_product_recipes` | Sim | Sim | Substituir | Não | Encerrar vigência | — | PUBLICADO (modelo de vigência, sem exclusão) |
@@ -38,7 +38,7 @@ Registros transacionais não entram no CRUD de exclusão: pedidos, OPs, massadas
 
 ## Progresso em 27/11/2026
 
-- **Fase B (backend)**: migration `20261127001000_catalog_lifecycle.sql` aplicada na homologação e verificada por SQL autenticado: prévia de dependências, exclusão bloqueada com histórico (23503), versão antiga recusada (40001), código duplicado (23505), idempotência por `request_id`, histórico, inativação e reativação, e recusa para perfis sem permissão (42501). Produção ainda não tem a migration.
+- **Fase B (backend)**: migration `20261127001000_catalog_lifecycle.sql` aplicada na homologação e verificada por SQL autenticado: prévia de dependências, exclusão bloqueada com histórico (23503), versão antiga recusada (40001), código duplicado (23505), idempotência por `request_id`, histórico, inativação e reativação, e recusa para perfis sem permissão (42501). Aplicada em produção em 27/11/2026 às 11:55 UTC, após backup verificado (MD5 1aa91131de96bdfd3f18253d295db843).
 - **Fases C e D (telas)**: componentes `RecordActions`, `Modal`, `RecordDrawer`, `CatalogLifecycleDialog`, `SimilarRecords` e avisos (`toast`). Aplicados em Cadastros operacionais (fornecedores, fabricantes, locais, insumos), Produtos (novo, editar, duplicar), Clientes (ciclo de vida só para Administração) e Motivos e destinações de perda.
 - **Testes**: Vitest 71 (70 passam, 1 ignorado); 64 verificações de tela com respostas simuladas em notebook, tablet e celular, para os perfis Administração e Vendas. O ambiente de desenvolvimento não alcança o Supabase pela rede, então o login real não pôde ser exercitado daqui.
 - **Pendente**: receitas (decisão de modelagem para "descontinuar"), usuários via Edge Function, aplicação em produção com backup.
