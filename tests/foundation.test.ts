@@ -70,6 +70,7 @@ beforeAll(async () => {
     '20261127000100_production_board_columns.sql',
     '20261127000200_production_board_realtime.sql',
     '20261127000300_production_board_revision.sql',
+    '20261127000400_workspace_search.sql',
   ]) {
     await db.exec(await migration(name))
   }
@@ -104,6 +105,18 @@ test('importa uma vez, preserva descrição e mantém água e receita pendentes'
   expect((await db.query('select quantity from public.recipe_ingredients')).rows).toEqual([{ quantity: null }])
   expect((await db.query('select status from public.recipe_versions')).rows).toEqual([{ status: 'PENDENTE_VALIDACAO' }])
   expect((await db.query('select id from public.audit_logs')).rows).toHaveLength(1)
+})
+
+test('busca global ignora acentos, pagina e respeita o acesso às receitas', async () => {
+  const search = (term: string, offset = 0) => db.query('select module,reference from public.workspace_search($1,$2)', [term, offset])
+  await asUser(admin)
+  expect((await search('PRÓDUTO DE TESTE')).rows).toEqual([{ module: 'products', reference: '1' }])
+  expect((await search('PRÓDUTO DE TESTE', 1)).rows).toEqual([])
+  expect((await search('receita ficticia')).rows).toEqual([{ module: 'recipes', reference: 'TESTE' }])
+  await asUser(sales)
+  expect((await search('receita ficticia')).rows).toEqual([])
+  await asUser(inactive)
+  await expect(search('teste')).rejects.toThrow('perfil')
 })
 
 test('rejeita duplicidades e desfaz toda a carga se um ingrediente for inválido', async () => {

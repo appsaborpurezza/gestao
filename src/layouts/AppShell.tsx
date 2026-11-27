@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { RecordSearch, type RecordMatch } from './RecordSearch'
 
 const departments = [
   { label: 'Principal', entries: [['dashboard', 'Indicadores']] },
@@ -25,11 +26,13 @@ const roleLabels: Record<string, string> = {
   ADMINISTRADOR: 'Administração', PRODUCAO: 'Produção', VENDAS: 'Vendas',
 }
 
-export function AppShell({ active, name, role, onNavigate, onSignOut, children }: {
+export function AppShell({ active, name, role, accountScope, onNavigate, onOpenRecord, onSignOut, children }: {
   active: string
   name?: string
   role?: string
+  accountScope: string
   onNavigate: (id: string) => void
+  onOpenRecord: (record: RecordMatch) => void
   onSignOut: () => Promise<void>
   children: ReactNode
 }) {
@@ -93,7 +96,7 @@ export function AppShell({ active, name, role, onNavigate, onSignOut, children }
       <img className="shell-logo" src={import.meta.env.BASE_URL + 'logo.png'} alt="Sabor Purezza Massas" width={44} height={44}/>
       <strong>Sabor Purezza SMART</strong>
       {role && <button type="button" className="secondary shell-search-control" aria-haspopup="dialog"
-        onClick={() => search.current?.showModal()}>Buscar módulos <kbd>Ctrl+K</kbd></button>}
+        onClick={() => search.current?.showModal()}>Buscar <kbd>Ctrl+K</kbd></button>}
       <span className="shell-connection" role="status">{online ? 'Rede disponível' : 'Sem conexão'}</span>
       {name && <div className="shell-user"><strong>{name}</strong><small>{roleLabels[role ?? '']}</small></div>}
       <button type="button" className="secondary" disabled={signingOut} onClick={async () => {
@@ -107,11 +110,17 @@ export function AppShell({ active, name, role, onNavigate, onSignOut, children }
       <button type="button" className="secondary" onClick={() => drawer.current?.close()}>Fechar menu</button>
       {navigation}
     </dialog>
-    <dialog ref={search} className="shell-search" aria-label="Buscar módulos" onClose={() => setTerm('')}>
-      <label>Buscar módulos <input type="search" autoFocus value={term} onChange={event => setTerm(event.target.value)} /></label>
+    <dialog ref={search} className="shell-search" aria-label="Busca global" onClose={() => setTerm('')}>
+      <label>Buscar módulos e registros <input type="search" maxLength={100} autoFocus value={term} onChange={event => setTerm(event.target.value)} /></label>
+      <h3>Módulos</h3>
       {matching.length ? <ul>{matching.map(([id, title]) => <li key={id}>
         <button type="button" className="secondary" onClick={() => { search.current?.close(); onNavigate(id!) }}>{title}</button>
       </li>)}</ul> : <p role="status">Nenhum módulo encontrado.</p>}
+      {role && <RecordSearch term={term} accountScope={accountScope} onOpen={record => {
+        if (!canNavigate(record.module, role)) return
+        search.current?.close()
+        onOpenRecord(record)
+      }}/>}
       <button type="button" className="secondary" onClick={() => search.current?.close()}>Fechar busca</button>
     </dialog>
     <main id="conteudo" tabIndex={-1} className="workspace shell-content">

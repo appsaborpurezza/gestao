@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 import { AppShell } from './layouts/AppShell'
+import type { RecordMatch } from './layouts/RecordSearch'
 import { Access } from './features/auth/Access'
 import { supabase } from './lib/supabase'
 import './styles.css'
@@ -27,6 +28,7 @@ const cache = new QueryClient({ defaultOptions: { queries: { retry: false, stale
 
 function Workspace({ userId }: { userId: string }) {
   const [tab, setTab] = useState('dashboard')
+  const [target, setTarget] = useState<RecordMatch | null>(null)
   const [unitItem, setUnitItem] = useState<string | null>(null)
   const [recipeReview, setRecipeReview] = useState<{ id: string; title: string } | null>(null)
   const profile = useQuery({
@@ -38,23 +40,27 @@ function Workspace({ userId }: { userId: string }) {
     },
   })
   const catalog = useQuery({
-    queryKey: ['items', userId],
+    queryKey: ['items', userId, target?.module === 'products' ? target.record_id : null],
     enabled: !!profile.data && tab === 'products',
     queryFn: async () => {
-      const { data, error } = await supabase.from('items')
+      const request = supabase.from('items')
         .select('id,original_code,original_description,commercial_description,classification,validation_status,base_unit,unit_version')
         .order('original_code')
+      if (target?.module === 'products') request.eq('id', target.record_id)
+      const { data, error } = await request
       if (error) throw error
       return data.sort((a, b) => a.original_code.localeCompare(b.original_code, 'pt-BR', { numeric: true }))
     },
   })
   const recipes = useQuery({
-    queryKey: ['recipes', userId],
+    queryKey: ['recipes', userId, target?.module === 'recipes' ? target.record_id : null],
     enabled: !!profile.data && profile.data.role !== 'VENDAS' && tab === 'recipes',
     queryFn: async () => {
-      const { data, error } = await supabase.from('recipes')
+      const request = supabase.from('recipes')
         .select('id,code,name,recipe_versions(id,version,status,yield_min,yield_target,yield_max,recipe_ingredients(id,ordinal,source_name,quantity,unit))')
         .order('code')
+      if (target?.module === 'recipes') request.eq('id', target.record_id)
+      const { data, error } = await request
       if (error) throw error
       return data
     },
@@ -62,7 +68,14 @@ function Workspace({ userId }: { userId: string }) {
   const role = profile.data?.role
   const productForUnits = catalog.data?.find(product => product.id === unitItem)
 
-  return <AppShell active={tab} role={role} name={profile.data?.display_name} onNavigate={setTab}
+  return <AppShell active={tab} role={role} name={profile.data?.display_name} accountScope={`${userId}:${role}`}
+    onNavigate={id => { setTarget(null); setTab(id) }}
+    onOpenRecord={record => {
+      setUnitItem(null)
+      setRecipeReview(null)
+      setTarget(record)
+      setTab(record.module)
+    }}
     onSignOut={async () => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
@@ -73,6 +86,7 @@ function Workspace({ userId }: { userId: string }) {
       {profile.data && <>
         {tab === 'dashboard' && <Suspense fallback={<p role="status">Abrindo indicadores…</p>}><Dashboard key={`${userId}:${role}`} accessKey={`${userId}:${role}`} /></Suspense>}
         {tab === 'products' && <section className="panel"><h1>Produtos</h1>
+          {target?.module === 'products' && <button type="button" className="secondary" onClick={() => { setUnitItem(null); setTarget(null) }}>Ver todos os produtos</button>}
           {role === 'ADMINISTRADOR' && productForUnits ? <Suspense fallback={<p role="status">Abrindo configuração…</p>}>
             <ProductUnits key={productForUnits.id} product={productForUnits} onClose={() => setUnitItem(null)}/>
           </Suspense> : <>
@@ -93,6 +107,7 @@ function Workspace({ userId }: { userId: string }) {
           </>}
         </section>}
         {tab === 'recipes' && role !== 'VENDAS' && <section className="panel"><h1>Receitas</h1>
+          {target?.module === 'recipes' && <button type="button" className="secondary" onClick={() => { setRecipeReview(null); setTarget(null) }}>Ver todas as receitas</button>}
           {recipeReview ? <Suspense fallback={<p role="status">Abrindo ficha…</p>}>
             <RecipeReview key={recipeReview.id} versionId={recipeReview.id} title={recipeReview.title}
               canEdit={role === 'ADMINISTRADOR'} canApprove={profile.data.can_approve_recipe} onClose={() => setRecipeReview(null)}/>
@@ -127,10 +142,10 @@ function Workspace({ userId }: { userId: string }) {
           <Inventory admin={role === 'ADMINISTRADOR'} release={profile.data.can_release_lot}/>
         </Suspense>}
         {tab === 'customers' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo cadastro…</p>}>
-          <Customers/>
+          <Customers key={target?.record_id ?? 'customers'} initialCustomer={target?.record_id}/>
         </Suspense>}
         {tab === 'orders' && role !== 'PRODUCAO' && <Suspense fallback={<p role="status">Abrindo pedidos…</p>}>
-          <Orders canRegisterBilling={role === 'VENDAS'}/>
+          <Orders key={target?.record_id ?? 'orders'} initialOrder={target?.record_id} canRegisterBilling={role === 'VENDAS'}/>
         </Suspense>}
         {tab === 'production-demand' && role !== 'VENDAS' && <Suspense fallback={<p role="status">Abrindo demandas…</p>}>
           <ProductionDemand/>
